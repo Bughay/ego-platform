@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -95,6 +97,13 @@ func (m *Manager) ValidateRefresh(tokenStr string) (*Claims, error) {
 }
 
 func (m *Manager) GenerateRefreshToken(userID string, email, role string) (string, error) {
+	// A random JWT ID makes every refresh token unique. Without it, two tokens
+	// minted in the same second (JWT timestamps are second-precision) would be
+	// byte-identical, which would break single-use rotation in the session store.
+	tokenID, err := newTokenID()
+	if err != nil {
+		return "", fmt.Errorf("auth: failed to generate token id: %w", err)
+	}
 	claims := jwtCustomClaims{
 		Claims: Claims{
 			UserID: userID,
@@ -102,6 +111,7 @@ func (m *Manager) GenerateRefreshToken(userID string, email, role string) (strin
 			Role:   role,
 		},
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        tokenID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.refreshExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "go-api-refresh",
@@ -109,4 +119,14 @@ func (m *Manager) GenerateRefreshToken(userID string, email, role string) (strin
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(m.secretKey)
+}
+
+// newTokenID returns a 128-bit random identifier as hex, used as the JWT ID
+// (jti) of refresh tokens so each issued token is unique.
+func newTokenID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }

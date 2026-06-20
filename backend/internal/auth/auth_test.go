@@ -224,7 +224,7 @@ func TestRegisterValidation(t *testing.T) {
 
 func TestRegisterHashesPasswordAndNormalizesEmail(t *testing.T) {
 	repo := &stubUserRepository{}
-	svc := NewAuthService(repo, testManager())
+	svc := NewAuthService(repo, newStubTokenRepo(), testManager())
 
 	password := "supersecret"
 	_, err := svc.Register(context.Background(), &RegisterRequest{Email: "  USER@Test.COM  ", Password: password})
@@ -254,7 +254,7 @@ func TestLogin(t *testing.T) {
 	}
 
 	t.Run("unknown email and wrong password return identical generic error", func(t *testing.T) {
-		svc := NewAuthService(newRepo(t), mgr)
+		svc := NewAuthService(newRepo(t), newStubTokenRepo(), mgr)
 
 		_, _, errUnknown := svc.Login(context.Background(), &LoginRequest{Email: "nobody@test.com", Password: password})
 		_, _, errWrongPw := svc.Login(context.Background(), &LoginRequest{Email: "user@test.com", Password: "wrong-password"})
@@ -271,7 +271,7 @@ func TestLogin(t *testing.T) {
 	})
 
 	t.Run("success returns valid tokens", func(t *testing.T) {
-		svc := NewAuthService(newRepo(t), mgr)
+		svc := NewAuthService(newRepo(t), newStubTokenRepo(), mgr)
 
 		resp, refreshToken, err := svc.Login(context.Background(), &LoginRequest{Email: "User@Test.com", Password: password})
 		if err != nil {
@@ -309,7 +309,9 @@ func TestRefreshAndLogout(t *testing.T) {
 
 	t.Run("refresh rotates tokens", func(t *testing.T) {
 		repo := &stubUserRepository{usersByEmail: map[string]*User{email: user}}
-		svc := NewAuthService(repo, mgr)
+		tokenRepo := newStubTokenRepo()
+		tokenRepo.hashes[hashToken(refreshToken)] = true // token is live in the store
+		svc := NewAuthService(repo, tokenRepo, mgr)
 
 		resp, newRefresh, err := svc.Refresh(context.Background(), refreshToken)
 		if err != nil {
@@ -325,7 +327,7 @@ func TestRefreshAndLogout(t *testing.T) {
 
 	t.Run("refresh rejects access token", func(t *testing.T) {
 		repo := &stubUserRepository{usersByEmail: map[string]*User{email: user}}
-		svc := NewAuthService(repo, mgr)
+		svc := NewAuthService(repo, newStubTokenRepo(), mgr)
 
 		if _, _, err := svc.Refresh(context.Background(), accessToken); err == nil {
 			t.Error("expected refresh with an access token to fail")
@@ -334,7 +336,7 @@ func TestRefreshAndLogout(t *testing.T) {
 
 	t.Run("refresh fails when user no longer exists", func(t *testing.T) {
 		repo := &stubUserRepository{} // empty: user deleted
-		svc := NewAuthService(repo, mgr)
+		svc := NewAuthService(repo, newStubTokenRepo(), mgr)
 
 		_, _, err := svc.Refresh(context.Background(), refreshToken)
 		if err == nil || !strings.Contains(err.Error(), "user no longer exists") {
@@ -343,7 +345,7 @@ func TestRefreshAndLogout(t *testing.T) {
 	})
 
 	t.Run("logout accepts valid refresh token and rejects garbage", func(t *testing.T) {
-		svc := NewAuthService(&stubUserRepository{}, mgr)
+		svc := NewAuthService(&stubUserRepository{}, newStubTokenRepo(), mgr)
 
 		if err := svc.Logout(context.Background(), refreshToken); err != nil {
 			t.Errorf("expected logout success, got: %v", err)
@@ -354,11 +356,72 @@ func TestRefreshAndLogout(t *testing.T) {
 	})
 }
 
+// TestRefreshRotationIsSingleUse verifies that a refresh token works exactly
+// once: after it is used to rotate, replaying it is rejected, while the freshly
+// issued token continues to work.
+func TestRefreshRotationIsSingleUse(t *testing.T) {
+	const password = "supersecret"
+	mgr := testManager()
+	repo := &stubUserRepository{usersByEmail: map[string]*User{
+		"user@test.com": {ID: "user-1", Email: "user@test.com", Password: hashPassword(t, password), Role: "user"},
+	}}
+	tokenRepo := newStubTokenRepo()
+	svc := NewAuthService(repo, tokenRepo, mgr)
+	ctx := context.Background()
+
+	_, refreshToken, err := svc.Login(ctx, &LoginRequest{Email: "user@test.com", Password: password})
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+	if _, ok := tokenRepo.hashes[hashToken(refreshToken)]; !ok {
+		t.Fatal("login must persist the refresh token in the store")
+	}
+
+	_, rotated, err := svc.Refresh(ctx, refreshToken)
+	if err != nil {
+		t.Fatalf("first refresh should succeed: %v", err)
+	}
+
+	if _, _, err := svc.Refresh(ctx, refreshToken); err == nil {
+		t.Error("replaying the consumed refresh token must be rejected")
+	}
+
+	if _, _, err := svc.Refresh(ctx, rotated); err != nil {
+		t.Errorf("the rotated refresh token should still work: %v", err)
+	}
+}
+
+// TestLogoutRevokesRefreshToken verifies that after logout the refresh token is
+// truly dead, even though its JWT signature and expiry are still valid.
+func TestLogoutRevokesRefreshToken(t *testing.T) {
+	const password = "supersecret"
+	mgr := testManager()
+	repo := &stubUserRepository{usersByEmail: map[string]*User{
+		"user@test.com": {ID: "user-1", Email: "user@test.com", Password: hashPassword(t, password), Role: "user"},
+	}}
+	tokenRepo := newStubTokenRepo()
+	svc := NewAuthService(repo, tokenRepo, mgr)
+	ctx := context.Background()
+
+	_, refreshToken, err := svc.Login(ctx, &LoginRequest{Email: "user@test.com", Password: password})
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+
+	if err := svc.Logout(ctx, refreshToken); err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	if _, _, err := svc.Refresh(ctx, refreshToken); err == nil {
+		t.Error("a logged-out refresh token must not be usable")
+	}
+}
+
 // --- Handler tests ---
 
 func newAuthHandler(t *testing.T, repo UserRepository, mgr *Manager) *AuthHandler {
 	t.Helper()
-	return NewAuthHandler(NewAuthService(repo, mgr), testLogger())
+	return NewAuthHandler(NewAuthService(repo, newStubTokenRepo(), mgr), testLogger())
 }
 
 func postJSON(t *testing.T, handlerFunc http.HandlerFunc, target string, body any) *httptest.ResponseRecorder {
@@ -473,7 +536,9 @@ func TestRefreshEndpoint(t *testing.T) {
 			t.Fatalf("GenerateRefreshToken failed: %v", err)
 		}
 
-		h := newAuthHandler(t, repo, mgr)
+		tokenRepo := newStubTokenRepo()
+		tokenRepo.hashes[hashToken(refreshToken)] = true // token is live in the store
+		h := NewAuthHandler(NewAuthService(repo, tokenRepo, mgr), testLogger())
 		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", nil)
 		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: refreshToken})
 		rec := httptest.NewRecorder()

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,11 @@ import (
 
 	"github.com/Bughay/egolifter/pkg/agent/helper"
 )
+
+// errEmptyContent is returned by DeepseekOneshotJSON when the model sends an
+// empty body. Callers that have a fallback strategy (e.g. the ReAct agent)
+// can detect this with errors.Is and retry via text mode.
+var errEmptyContent = errors.New("LLM returned empty JSON content")
 
 const (
 	deepseekURL = "https://api.deepseek.com/beta/v1/chat/completions"
@@ -25,19 +31,9 @@ const (
 // dialing a fresh connection on every call.
 var httpClient = &http.Client{Timeout: apiTimeout}
 
-// Message is one chat turn. Role/Content cover ordinary turns; the two optional
-// fields carry the native tool-calling protocol:
-//   - ToolCalls is set on an assistant turn that asked to call one or more tools.
-//   - ToolCallID is set on a role:"tool" turn and links its Content (the tool's
-//     result) back to the matching ToolCall.ID.
-//
-// Both use omitempty, so a plain {Role, Content} message serializes exactly as
-// before and never sends the tool fields on the wire.
 type Message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type ChatTemplate struct {
@@ -91,11 +87,33 @@ type ChatResponse struct {
 func EnsureAPIKey() error { return helper.EnsureAPIKey("DEEPSEEKAPIKEY") }
 
 // doRequest performs a single DeepSeek chat-completion HTTP call and returns the
-// decoded response. It centralizes the boilerplate so each caller is just
-// "build a ChatTemplate, hand it here, post-process".
+// decoded response. It centralizes the boilerplate that used to be copy-pasted
+// across DeepseekOneshot / DeepseekOneshotJSON / DeepseekOneshotMemory, so each
+// of those is now just "build a ChatTemplate, hand it here, post-process".
 //
 // The call is bound to ctx: cancelling ctx (timeout or manual cancel) aborts the
 // in-flight HTTP request.
+//
+// Step-by-step (pseudocode):
+//
+//  1. key  := loadAPIKey()                  // read DEEPSEEKAPIKEY (.env or env)
+//     if key missing -> return error
+//  2. body := json.Marshal(chat)            // serialize the request payload
+//     if marshal fails -> return error
+//  3. req  := POST deepseekURL with body    // request is bound to ctx
+//     set header  Content-Type: application/json
+//     set header  Authorization: Bearer <key>
+//  4. resp := httpClient.Do(req)            // shared client -> connection reuse
+//     if transport error / ctx cancelled -> return error
+//     defer close(resp.Body)
+//  5. if resp.StatusCode != 200             // surface the API error body verbatim
+//     -> return error(status, body)
+//  6. raw  := readAll(resp.Body)            // read the whole body once
+//     if raw is blank -> return error("empty response body")
+//  7. out  := json.Unmarshal(raw)           // decode into ChatResponse
+//     if decode fails -> return error
+//  8. if out has no choices -> return error
+//  9. return &out                           // caller pulls content / finish_reason
 func doRequest(ctx context.Context, chat *ChatTemplate) (*ChatResponse, error) {
 	apiKey, err := helper.LoadAPIKey("DEEPSEEKAPIKEY")
 	if err != nil {
@@ -173,11 +191,41 @@ func DeepseekOneshot(ctx context.Context, model string, systemMessage string, us
 	return resp.Choices[0].Message.Content, nil
 }
 
+func DeepseekOneshotJSON(ctx context.Context, model string, messages []Message, temperature float64, maxTokens int) (string, error) {
+	chat := &ChatTemplate{
+		Model:          model,
+		Messages:       messages,
+		Stream:         false,
+		Temperature:    &temperature,
+		MaxTokens:      maxTokens,
+		ResponseFormat: &ResponseFormat{Type: "json_object"},
+		// No ReasoningEffort and no ExtraBody/thinking: JSON mode must NOT run as a
+		// reasoning model, or the model routes output into reasoning_content (which
+		// we don't decode) and stresses constrained decoding -> empty/broken JSON.
+		// This matches the documented minimal json_object request.
+	}
+
+	resp, err := doRequest(ctx, chat)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("output truncated due to max_tokens limit (current: %d)", maxTokens)
+	}
+
+	content := resp.Choices[0].Message.Content
+	if strings.TrimSpace(content) == "" {
+		return "", errEmptyContent
+	}
+	return content, nil
+}
+
 // deepseekToolCall makes a tools-enabled chat call and returns the assistant
 // message's content (the model's reasoning / brief note), any structured
-// tool_calls it asked for, and the finish_reason. This is the one and only model
-// call the agent makes: the model is given the official tools parameter
-// (tool_choice "auto") and answers with content + tool_calls together.
+// tool_calls it asked for, and the finish_reason. It is the v2 primary path: the
+// model is given the official tools parameter (tool_choice "auto") and answers
+// with content + tool_calls together instead of the custom {reasoning, act} JSON.
 //
 // Tools/ToolChoice are only set when at least one tool is supplied, so a
 // tool-less agent degrades to a plain content call. No response_format is set —

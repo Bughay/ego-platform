@@ -2,7 +2,6 @@ package deepseek
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -32,7 +31,7 @@ type Agent struct {
 	SystemPrompt string
 	UserPrompt   string
 	Memory       []Message
-	Thinking     bool // run the text-generation call as a DeepSeek reasoning ("thinking") model
+	Thinking     bool // run the model call as a DeepSeek reasoning ("thinking") model
 	Tools        []Tool
 	Registry     map[string]func(string) (string, error)
 	SchemaData   []byte // embedded tool schema JSON (preferred over Path)
@@ -56,120 +55,24 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 
 // trimMemory keeps the system prompt and first user message then slides a
 // window over the most recent iterations to cap memory growth.
+//
+// The window must not begin with orphaned role:"tool" results whose assistant
+// (tool_calls) parent was trimmed away — the API rejects a tool message that
+// doesn't follow an assistant tool-call turn — so any leading tool messages in
+// the window are dropped.
 func (a *Agent) trimMemory() {
 	const head = 2
 	if len(a.Memory) <= head+memoryWindowSize {
 		return
 	}
-	trimmed := make([]Message, head+memoryWindowSize)
-	copy(trimmed[:head], a.Memory[:head])
-	copy(trimmed[head:], a.Memory[len(a.Memory)-memoryWindowSize:])
+	tail := a.Memory[len(a.Memory)-memoryWindowSize:]
+	for len(tail) > 0 && tail[0].Role == "tool" {
+		tail = tail[1:]
+	}
+	trimmed := make([]Message, 0, head+len(tail))
+	trimmed = append(trimmed, a.Memory[:head]...)
+	trimmed = append(trimmed, tail...)
 	a.Memory = trimmed
-}
-
-// convertTextToJSON repairs a non-JSON agent message into the strict
-// {reasoning, act} shape using the embedded tool schema. It is only used when
-// the model's own text output did not already parse as JSON, so it is a repair
-// step rather than the primary path.
-func (a *Agent) convertTextToJSON(ctx context.Context, text string) (string, error) {
-	slog.Info("agent text not valid JSON, converting via schema")
-
-	toolsStr, err := ToolsToLLMStringFromData(a.SchemaData)
-	if err != nil {
-		return "", fmt.Errorf("load tools for conversion: %w", err)
-	}
-
-	schema := `{
-    "reasoning": "your step-by-step thinking about what to do",
-    "act": "tool_name|arg1,arg2 OR finish|your_final_answer"
-}`
-	conversionContext := "You convert another agent's plain-text answer into a single JSON object that matches the schema and tools described below. Read the text you are given and express it as the JSON object — do not add information that is not in the text. "
-	jsonMessages := []Message{
-		{Role: "system", Content: conversionContext + "\nYou must respond in this exact JSON format:\n" + schema + "\nHere are the tools schema: \n" + toolsStr},
-		{Role: "user", Content: text},
-	}
-
-	result, err := DeepseekOneshotJSON(ctx, a.Model, jsonMessages, 0.1, a.MaxTokens)
-	if err != nil {
-		return "", fmt.Errorf("convert to JSON: %w", err)
-	}
-
-	slog.Info("converted to JSON successfully")
-	return result, nil
-}
-
-// stripCodeFence removes markdown code fences (```json ... ``` or ``` ... ```)
-// that the LLM sometimes wraps around its JSON response.
-func stripCodeFence(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "```") {
-		if idx := strings.Index(s, "\n"); idx != -1 {
-			s = s[idx+1:]
-		}
-		if idx := strings.LastIndex(s, "```"); idx != -1 {
-			s = s[:idx]
-		}
-	}
-	return strings.TrimSpace(s)
-}
-
-// parseAgentResponse strips any markdown code fence and unmarshals the raw model
-// output into an AgentResponse.
-func parseAgentResponse(raw string) (*AgentResponse, error) {
-	var resp AgentResponse
-	if err := json.Unmarshal([]byte(stripCodeFence(raw)), &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// attempt makes one reasoning step. It generates the model's answer as plain
-// text first, then tries to parse that text directly as the {reasoning, act}
-// JSON. The text model almost always emits that object already, and parsing it
-// directly preserves a long final answer verbatim instead of losing it when
-// re-encoding into the act string. Only when the text is NOT valid JSON does it
-// fall back to convertTextToJSON (which needs SchemaData). Transport/API/context
-// errors propagate so oneloop can retry the whole step.
-func (a *Agent) attempt(ctx context.Context, messages []Message) (*AgentResponse, error) {
-	text, err := DeepseekOneshotMemory(ctx, a.Model, messages, 0.1, a.MaxTokens, a.Thinking)
-	if err != nil {
-		return nil, fmt.Errorf("text generation: %w", err)
-	}
-
-	if resp, perr := parseAgentResponse(text); perr == nil {
-		return resp, nil // text was already valid JSON — use it as-is
-	}
-
-	if len(a.SchemaData) == 0 {
-		return nil, fmt.Errorf("agent text not parseable and no schema for conversion")
-	}
-	converted, cerr := a.convertTextToJSON(ctx, text)
-	if cerr != nil {
-		return nil, cerr
-	}
-	return parseAgentResponse(converted)
-}
-
-func (a *Agent) oneloop(ctx context.Context, messages []Message) (*AgentResponse, error) {
-	var lastErr error
-
-	for i := 0; i < maxRetries; i++ {
-		resp, err := a.attempt(ctx, messages)
-		if err == nil {
-			return resp, nil
-		}
-		// Don't burn retries on a cancelled/expired context — bail immediately.
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, err
-		}
-		lastErr = err
-		slog.Error("agent attempt failed", "retry", i, "err", err)
-		if serr := sleepCtx(ctx, retryDelay); serr != nil {
-			return nil, serr
-		}
-	}
-
-	return nil, fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
 // FinishAnswer returns the text after the "finish|" prefix of a finished
@@ -178,35 +81,60 @@ func (r *AgentResponse) FinishAnswer() string {
 	return strings.TrimPrefix(r.Act, "finish|")
 }
 
-func (a *Agent) Run(ctx context.Context) (*AgentResponse, error) {
-	var (
-		toolsDesc string
-		err       error
-	)
-	if len(a.SchemaData) > 0 {
-		toolsDesc, err = ToolsToLLMStringFromData(a.SchemaData)
-	} else {
-		toolsDesc, err = ToolsToLLMString(a.Path)
+// callModel makes one tools-enabled model call with retries. It returns the
+// assistant content (reasoning), any tool_calls, and the finish_reason. A
+// cancelled/expired context bails immediately instead of burning retries; other
+// transport/API errors are retried up to maxRetries with retryDelay backoff.
+func (a *Agent) callModel(ctx context.Context, messages []Message) (string, []ToolCall, string, error) {
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		content, toolCalls, finish, err := deepseekToolCall(ctx, a.Model, messages, 0.1, a.MaxTokens, a.Tools, a.Thinking)
+		if err == nil {
+			return content, toolCalls, finish, nil
+		}
+		// Don't burn retries on a cancelled/expired context — bail immediately.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", nil, "", err
+		}
+		lastErr = err
+		slog.Error("agent model call failed", "retry", i, "err", err)
+		if serr := sleepCtx(ctx, retryDelay); serr != nil {
+			return "", nil, "", serr
+		}
 	}
-	if err != nil {
-		return nil, fmt.Errorf("load tools: %w", err)
+	return "", nil, "", fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// Run drives the native tool-calling loop. Each iteration makes one tools-enabled
+// model call: if the model returns no tool_calls it has answered, so we finish; if
+// it returns tool_calls we echo the assistant turn (with its tool_calls), run each
+// tool, append a role:"tool" result keyed by tool_call_id, and loop. This is the
+// standard DeepSeek/OpenAI function-calling protocol end-to-end — no custom
+// {reasoning, act} text parsing or JSON repair.
+func (a *Agent) Run(ctx context.Context) (*AgentResponse, error) {
+	// Send the tools via the official `tools` parameter. Callers normally set
+	// a.Tools already; load it from the embedded schema if they didn't so the
+	// structured path always has tool definitions to offer.
+	if len(a.Tools) == 0 && len(a.SchemaData) > 0 {
+		loaded, err := LoadToolsFromData(a.SchemaData)
+		if err != nil {
+			return nil, fmt.Errorf("load tools: %w", err)
+		}
+		a.Tools = loaded
 	}
 
-	fullSystemPrompt := fmt.Sprintf(`You are a ReAct agent that solves problems through reasoning and tool use.
+	// The tools are advertised to the model through the native `tools` parameter,
+	// so the system prompt only needs to describe the task and the protocol — no
+	// inline tool catalog.
+	fullSystemPrompt := fmt.Sprintf(`You are an agent that solves problems through reasoning and tool use.
 The Task you will be solving:
 %s
 
-Available tools:
-%s
-
-You must respond in this exact JSON format:
-{
-    "reasoning": "your step-by-step thinking about what to do",
-    "act": "tool_name|arg1,arg2 OR finish|your_final_answer"
-}
-
-If you need a tool, use "act": "tool_name|arguments".
-If you have the answer, use "act": "finish|your answer here".`, a.SystemPrompt, toolsDesc)
+You can call the available tools as functions. To take an action, CALL the
+appropriate tool with its arguments — do not describe the call in plain text. Put
+your step-by-step thinking for the current step in the message content. When you
+have the final answer and need no more tools, reply with the answer as plain
+message content and do NOT call any tool.`, a.SystemPrompt)
 
 	// Memory may already hold prior conversation turns seeded by the caller;
 	// wrap the system prompt around the front and the current user prompt at the
@@ -222,52 +150,40 @@ If you have the answer, use "act": "finish|your answer here".`, a.SystemPrompt, 
 		}
 		slog.Info("agent iteration", "step", i+1, "memoryMessages", len(a.Memory))
 
-		resp, err := a.oneloop(ctx, a.Memory)
+		content, toolCalls, _, err := a.callModel(ctx, a.Memory)
 		if err != nil {
 			return nil, err
 		}
 
-		if strings.HasPrefix(resp.Act, "finish|") {
-			// Never hand back an empty final reply: if the answer is blank, fall
-			// back to the reasoning text so the user always sees something.
-			if strings.TrimSpace(resp.FinishAnswer()) == "" {
-				resp.Act = "finish|" + strings.TrimSpace(resp.Reasoning)
-			}
+		// No tool calls -> the model has produced the final answer.
+		if len(toolCalls) == 0 {
+			answer := strings.TrimSpace(content)
 			slog.Info("agent finished", "steps", i+1)
-			return resp, nil
+			return &AgentResponse{Reasoning: content, Act: "finish|" + answer}, nil
 		}
 
-		parts := strings.SplitN(resp.Act, "|", 2)
-		if len(parts) != 2 {
-			slog.Warn("invalid act format, feeding back to agent", "act", resp.Act)
-			a.Memory = append(a.Memory,
-				Message{Role: "assistant", Content: fmt.Sprintf("Reasoning: %s\nAct: %s", resp.Reasoning, resp.Act)},
-				Message{Role: "user", Content: fmt.Sprintf("Observation: Invalid action format %q — use 'tool_name|args' or 'finish|your answer'.", resp.Act)},
-			)
-			a.trimMemory()
-			if err := sleepCtx(ctx, iterationDelay); err != nil {
-				return nil, err
+		// Echo the assistant turn WITH its tool_calls: the follow-up role:"tool"
+		// results are only valid when they trail an assistant message that asked
+		// for those calls.
+		a.Memory = append(a.Memory, Message{Role: "assistant", Content: content, ToolCalls: toolCalls})
+
+		// Run every requested tool and append its result as a role:"tool" message
+		// linked back to the call by tool_call_id.
+		for _, tc := range toolCalls {
+			slog.Info("tool call", "tool", tc.Function.Name)
+			result := fmt.Sprintf("Tool not found: %s", tc.Function.Name)
+			if executeFunc, exists := a.Registry[tc.Function.Name]; exists {
+				out, ferr := executeFunc(tc.Function.Arguments)
+				if ferr != nil {
+					result = fmt.Sprintf("Error: %v", ferr)
+					slog.Error("tool error", "tool", tc.Function.Name, "err", ferr)
+				} else {
+					result = out
+				}
 			}
-			continue
-		}
-		toolName, toolArgs := parts[0], parts[1]
-		slog.Info("tool call", "tool", toolName)
-
-		observation := fmt.Sprintf("Tool not found: %s", toolName)
-		if executeFunc, exists := a.Registry[toolName]; exists {
-			result, err := executeFunc(toolArgs)
-			if err != nil {
-				observation = fmt.Sprintf("Error: %v", err)
-				slog.Error("tool error", "tool", toolName, "err", err)
-			} else {
-				observation = result
-			}
+			a.Memory = append(a.Memory, Message{Role: "tool", ToolCallID: tc.ID, Content: result})
 		}
 
-		a.Memory = append(a.Memory,
-			Message{Role: "assistant", Content: fmt.Sprintf("Reasoning: %s\nAct: %s", resp.Reasoning, resp.Act)},
-			Message{Role: "user", Content: "Observation: " + observation},
-		)
 		a.trimMemory()
 		if err := sleepCtx(ctx, iterationDelay); err != nil {
 			return nil, err

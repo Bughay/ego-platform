@@ -165,6 +165,22 @@ func EgolifterFunctions(ctx context.Context, svc Services, userID string) map[st
 			return jsonResult(routines)
 		},
 
+		// create_routine saves a reusable workout routine (template) for the
+		// user. The saved routine's id can later be passed to log_workout to
+		// log it.
+		"create_routine": func(args string) (string, error) {
+			var req training.CreateRoutineRequest
+			if err := json.Unmarshal([]byte(args), &req); err != nil {
+				return "", fmt.Errorf("create_routine: invalid JSON args: %w", err)
+			}
+			routine, err := svc.Training.SaveRoutine(ctx, userID, &req)
+			if err != nil {
+				return "", err
+			}
+			slog.Info("tool called", "tool", "create_routine")
+			return jsonResult(routine)
+		},
+
 		// --- recipes ----------------------------------------------------
 
 		// create_recipe builds a recipe from foods already in the catalog. Each

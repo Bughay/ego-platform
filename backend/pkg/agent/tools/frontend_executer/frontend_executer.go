@@ -2,6 +2,7 @@ package tools
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,17 +34,29 @@ func FileFunctionsWithPath(basePath string) map[string]func(string) (string, err
 
 	write := func(toolName, filename string) func(string) (string, error) {
 		return func(args string) (string, error) {
+			// Native function-calling delivers arguments as a JSON object
+			// {"content": "..."}; the prompt-driven path passes the raw file
+			// content directly. Accept both: unwrap the "content" field when args
+			// is that object, otherwise write args verbatim.
+			content := args
+			var wrapped struct {
+				Content string `json:"content"`
+			}
+			if err := json.Unmarshal([]byte(args), &wrapped); err == nil && wrapped.Content != "" {
+				content = wrapped.Content
+			}
+
 			path := filepath.Join(basePath, filename)
 			if dir := filepath.Dir(path); dir != "." {
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return "", fmt.Errorf("%s: mkdir %s: %v", toolName, dir, err)
 				}
 			}
-			if err := os.WriteFile(path, []byte(args), 0644); err != nil {
+			if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 				return "", fmt.Errorf("%s: write %s: %v", toolName, path, err)
 			}
-			slog.Info("tool called", "tool", toolName, "bytes", len(args))
-			return fmt.Sprintf("successfully wrote %d bytes to %s", len(args), path), nil
+			slog.Info("tool called", "tool", toolName, "bytes", len(content))
+			return fmt.Sprintf("successfully wrote %d bytes to %s", len(content), path), nil
 		}
 	}
 

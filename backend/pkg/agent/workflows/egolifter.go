@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	egolifterModel    = "deepseek-v4-flash"
+	egolifterModel    = "deepseek-v4-pro"
 	egolifterTokens   = 100000
 	egolifterPrompt   = prompts.EgolifterAgentPrompt
 	egolifterThinking = false

@@ -131,6 +131,27 @@
     {
         "type": "function",
         "function": {
+            "name": "create_routine",
+            "description": "Create a reusable workout routine (a saved training template) for the user. Records the planned exercises with target weight and reps. The saved routine can later be logged with log_workout by passing its id as routine_id. Use this to save a routine for future use; use log_workout to record a workout the user actually performed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The routine's name, e.g. \"Push day\"."
+                    },
+                    "entries": {
+                        "type": "array",
+                        "description": "The planned exercises (at least one). Each item is a JSON object {\"name\": string, \"weight_kg\": number (0 to 1000), \"reps\": integer (1 to 100)}."
+                    }
+                },
+                "required": ["name", "entries"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "create_recipe",
             "description": "Create a recipe built from foods already in the catalog. Every ingredient must reference an existing food by its food_id — get these from list_foods, or create the foods first with create_foods. Do not invent food_id values.",
             "parameters": {
