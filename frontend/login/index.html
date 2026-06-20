@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EGO ACCESS PORTAL</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="card">
+  <div class="header">
+    <div class="logo">Ego AI</div>
+    <h1>EGO</h1>
+    <div class="divider"></div>
+  </div>
+
+  <div class="forms-slider">
+
+    <form id="loginForm" novalidate>
+      <div class="field" id="field-email">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="user@domain.net" autocomplete="email" />
+        <div class="error-msg" id="err-email">Invalid email address</div>
+      </div>
+
+      <div class="field" id="field-password">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••••••" autocomplete="current-password" />
+        <button type="button" class="toggle-pw" id="togglePw" aria-label="Toggle password visibility">
+          <svg class="icon-show" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="icon-hide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+        <div class="error-msg" id="err-password">Access key required</div>
+      </div>
+
+      <div class="buttons">
+        <button type="submit" class="btn btn-primary" id="btnLogin">LOGIN</button>
+        <button type="button" class="btn btn-outline" id="btnRegister">REGISTER</button>
+      </div>
+      <div class="api-msg" id="loginMsg" role="status"></div>
+    </form>
+
+    <form id="registerForm" novalidate>
+      <div class="field" id="field-reg-firstname">
+        <label for="reg-firstname">First Name</label>
+        <input type="text" id="reg-firstname" name="firstname" placeholder="Jane" autocomplete="given-name" />
+        <div class="error-msg" id="err-reg-firstname">First name required</div>
+      </div>
+
+      <div class="field" id="field-reg-lastname">
+        <label for="reg-lastname">Last Name</label>
+        <input type="text" id="reg-lastname" name="lastname" placeholder="Doe" autocomplete="family-name" />
+        <div class="error-msg" id="err-reg-lastname">Last name required</div>
+      </div>
+
+      <div class="field" id="field-reg-dob">
+        <label for="reg-dob">Date of Birth</label>
+        <input type="date" id="reg-dob" name="dob" autocomplete="bday" />
+        <div class="error-msg" id="err-reg-dob">Date of birth required</div>
+      </div>
+
+      <div class="field" id="field-reg-email">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" name="reg-email" placeholder="user@domain.net" autocomplete="email" />
+        <div class="error-msg" id="err-reg-email">Invalid email address</div>
+      </div>
+
+      <div class="field" id="field-reg-password">
+        <label for="reg-password">Access Key</label>
+        <input type="password" id="reg-password" name="reg-password" placeholder="••••••••••••" autocomplete="new-password" />
+        <button type="button" class="toggle-pw" id="toggleRegPw" aria-label="Toggle password visibility">
+          <svg class="icon-show" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="icon-hide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+        <div class="error-msg" id="err-reg-password">Min 8 characters</div>
+      </div>
+
+      <div class="field" id="field-reg-confirm">
+        <label for="reg-confirm">Confirm Key</label>
+        <input type="password" id="reg-confirm" name="reg-confirm" placeholder="••••••••••••" autocomplete="new-password" />
+        <button type="button" class="toggle-pw" id="toggleRegConfirm" aria-label="Toggle confirm password visibility">
+          <svg class="icon-show" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="icon-hide" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+        <div class="error-msg" id="err-reg-confirm">Passwords do not match</div>
+      </div>
+
+      <div class="buttons">
+        <button type="button" class="btn btn-outline" id="btnBack">BACK</button>
+        <button type="submit" class="btn btn-primary">ENROLL</button>
+      </div>
+      <div class="api-msg" id="registerMsg" role="status"></div>
+    </form>
+
+  </div>
+
+  <div class="card-footer">SECURE CHANNEL &nbsp;|&nbsp; ENCRYPTED</div>
+</div>
+
+<script src="../shared/api.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

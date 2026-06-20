@@ -1,0 +1,1592 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --cyan:    #00f5ff;
+  --magenta: #ff00ff;
+  --dark:    #040d14;
+  --card-bg: rgba(4, 18, 30, 0.75);
+  --border:  rgba(0, 245, 255, 0.35);
+  --text:    #c8f0ff;
+  --muted:   rgba(0, 245, 255, 0.45);
+  --error:   #ff4d6d;
+  --gold:    #ffd34d;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  min-height: 100vh;
+  background: var(--dark);
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--text);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Scanline overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Animated orbs */
+canvas#bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.sidebar {
+  position: relative;
+  z-index: 1;
+  width: 220px;
+  min-height: 100vh;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 30px rgba(0, 245, 255, 0.08),
+    0 0 80px rgba(0, 245, 255, 0.04),
+    inset 0 0 30px rgba(0, 245, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  padding: 32px 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Corner accent brackets */
+.sidebar::before,
+.sidebar::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: var(--cyan);
+  border-style: solid;
+}
+.sidebar::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.sidebar::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* ── Logo ────────────────────────────────────────────── */
+.logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 36px;
+  padding: 0 4px;
+}
+
+/* ── Nav ─────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.25s, background 0.25s, color 0.25s, border-color 0.25s;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+/* Shine sweep on hover */
+.nav-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+.nav-btn:hover::after { transform: translateX(100%); }
+
+.nav-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 245, 255, 0.5);
+  color: var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 245, 255, 0.1);
+}
+
+.nav-btn.active {
+  background: var(--cyan);
+  color: #020c12;
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgba(0, 245, 255, 0.35), inset 0 0 12px rgba(0, 245, 255, 0.1);
+}
+
+.nav-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 32px rgba(0, 245, 255, 0.65), 0 6px 20px rgba(0, 245, 255, 0.25);
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Main area ───────────────────────────────────────── */
+.main-content {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  padding: 40px 48px;
+}
+
+/* ── Nutrition Panel ─────────────────────────────────── */
+.nutrition-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 980px;
+}
+
+.panel-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--cyan);
+  text-transform: uppercase;
+}
+
+/* ── Food Entries List ───────────────────────────────── */
+.food-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Single Food / Exercise / Ingredient Entry Row ──── */
+.food-entry,
+.exercise-entry,
+.ingredient-entry {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 20px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 16px rgba(0, 245, 255, 0.05), inset 0 0 16px rgba(0, 245, 255, 0.02);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.food-entry:hover,
+.exercise-entry:hover,
+.ingredient-entry:hover {
+  border-color: rgba(0, 245, 255, 0.55);
+  box-shadow: 0 0 24px rgba(0, 245, 255, 0.1), inset 0 0 16px rgba(0, 245, 255, 0.03);
+}
+
+/* ── Field inside food / exercise / ingredient entry ─── */
+.food-entry .field,
+.exercise-entry .field,
+.ingredient-entry .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.food-entry .field:first-child {
+  flex: 2;
+}
+
+.food-entry .field label,
+.exercise-entry .field label,
+.ingredient-entry .field label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.food-entry .field input,
+.exercise-entry .field input,
+.ingredient-entry .field input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.food-entry .field input::-webkit-outer-spin-button,
+.food-entry .field input::-webkit-inner-spin-button,
+.exercise-entry .field input::-webkit-outer-spin-button,
+.exercise-entry .field input::-webkit-inner-spin-button,
+.ingredient-entry .field input::-webkit-outer-spin-button,
+.ingredient-entry .field input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.food-entry .field input::placeholder,
+.exercise-entry .field input::placeholder,
+.ingredient-entry .field input::placeholder {
+  color: rgba(0, 245, 255, 0.2);
+}
+
+.food-entry .field input:focus,
+.exercise-entry .field input:focus,
+.ingredient-entry .field input:focus {
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+
+/* ── Training panel ──────────────────────────────────── */
+.training-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 980px;
+}
+
+/* ── Exercise entries list ───────────────────────────── */
+.exercise-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Training name field (Create Training) ───────────── */
+.training-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.training-name-wrap label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.training-name-wrap input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 18px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  max-width: 480px;
+}
+
+.training-name-wrap input::placeholder {
+  color: rgba(0, 245, 255, 0.2);
+}
+
+.training-name-wrap input:focus {
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+
+/* ── Create training form ────────────────────────────── */
+.create-training-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Recipe panel ────────────────────────────────────── */
+.recipe-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 980px;
+}
+
+/* ── Ingredient entries list ─────────────────────────── */
+.ingredient-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Create recipe form ──────────────────────────────── */
+.create-recipe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Recipe notes / instructions textarea ────────────── */
+.recipe-notes-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recipe-notes-wrap label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.recipe-notes-wrap textarea {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 12px;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.recipe-notes-wrap textarea::placeholder {
+  color: rgba(0, 245, 255, 0.2);
+}
+
+.recipe-notes-wrap textarea:focus {
+  border-color: var(--cyan);
+}
+
+/* ── View recipes empty state ────────────────────────── */
+.view-recipes-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: var(--muted);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 4px;
+}
+
+/* ── Remove button ───────────────────────────────────── */
+.remove-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 0, 255, 0.3);
+  border-radius: 2px;
+  background: transparent;
+  color: rgba(255, 0, 255, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.remove-btn:hover {
+  color: var(--magenta);
+  border-color: var(--magenta);
+  box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+}
+
+/* ── Nutrition tabs ──────────────────────────────────── */
+.nutrition-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tab-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 11px 20px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+
+.tab-btn:hover::after { transform: translateX(100%); }
+
+.tab-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.2);
+}
+
+.tab-btn.active {
+  background: var(--cyan);
+  color: #020c12;
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgba(0, 245, 255, 0.35), inset 0 0 12px rgba(0, 245, 255, 0.1);
+}
+
+/* ── Create food form ────────────────────────────────── */
+.create-food-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 16px rgba(0, 245, 255, 0.05), inset 0 0 16px rgba(0, 245, 255, 0.02);
+}
+
+.per-100g-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 5px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.6);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  padding: 6px 14px;
+  width: fit-content;
+  border-radius: 2px;
+  background: rgba(0, 245, 255, 0.06);
+}
+
+.create-fields {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.create-food-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.create-food-form .field label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.create-food-form .field input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.create-food-form .field input::-webkit-outer-spin-button,
+.create-food-form .field input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.create-food-form .field input::placeholder {
+  color: rgba(0, 245, 255, 0.2);
+}
+
+.create-food-form .field input:focus {
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+
+/* ── Bottom action buttons ───────────────────────────── */
+.nutrition-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.add-food-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 11px 20px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+
+.add-food-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+
+.add-food-btn:hover::after { transform: translateX(100%); }
+
+.add-food-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.2);
+}
+
+.log-meal-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 11px 28px;
+  border: 1px solid var(--cyan);
+  border-radius: 2px;
+  background: var(--cyan);
+  color: #020c12;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.25s, transform 0.15s;
+}
+
+.log-meal-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+
+.log-meal-btn:hover::after { transform: translateX(100%); }
+
+.log-meal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(0, 245, 255, 0.5), 0 6px 20px rgba(0, 245, 255, 0.2);
+}
+
+/* ══════════════════════════════════════════════════════
+   Backend wiring: sidebar footer, status banner, data lists
+   ══════════════════════════════════════════════════════ */
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-footer .operator {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+  margin-bottom: 4px;
+}
+
+.sidebar-action {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.sidebar-action:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 12px rgba(0, 245, 255, 0.25);
+}
+
+/* Status banner (fixed, top-center) */
+.status-banner {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  max-width: 70vw;
+  padding: 12px 22px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  border: 1px solid var(--border);
+  background: rgba(4, 13, 20, 0.95);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.status-banner.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+.status-banner.is-ok    { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 18px rgba(0, 245, 255, 0.3); }
+.status-banner.is-error { color: #ff4d6d; border-color: #ff4d6d; box-shadow: 0 0 18px rgba(255, 77, 109, 0.3); }
+
+/* Data list rows (My Foods / My Meals / Workouts / Recipes) */
+.data-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.data-row .data-main {
+  flex: 0 0 30%;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 15px;
+  color: var(--text);
+}
+.data-row .data-macros {
+  flex: 1;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+.data-row .per100 { opacity: 0.6; }
+.data-row .remove-btn { visibility: visible; }
+
+.list-loading {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 16px 4px;
+}
+
+/* ── My Meals date filter ────────────────────────────── */
+.meal-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.meal-quick-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+.quick-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.2);
+}
+
+.quick-btn.active {
+  background: var(--cyan);
+  color: #020c12;
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgba(0, 245, 255, 0.35), inset 0 0 12px rgba(0, 245, 255, 0.1);
+}
+
+.meal-date-fields {
+  display: flex;
+  gap: 16px;
+}
+
+.meal-date-fields .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meal-date-fields .field label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.meal-date-fields .field input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  color-scheme: dark;
+}
+
+.meal-date-fields .field input:focus {
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+
+.calories-today {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.6);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  background: rgba(0, 245, 255, 0.06);
+  border-radius: 2px;
+  padding: 8px 14px;
+  width: fit-content;
+  margin-bottom: 16px;
+}
+
+/* ── Meal detail modal ───────────────────────────────── */
+.data-row .meal-time {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.meal-time {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.view-btn {
+  flex-shrink: 0;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.25s, border-color 0.25s, box-shadow 0.25s;
+}
+
+.view-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.2);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(2, 12, 18, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meal-modal {
+  width: 75vw;
+  height: 75vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.15), inset 0 0 16px rgba(0, 245, 255, 0.02);
+}
+
+.meal-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.meal-modal-head .meal-time {
+  margin-left: auto;
+}
+
+.modal-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.2);
+}
+
+.meal-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-top: 8px;
+}
+
+.meal-modal-totals {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.6);
+  padding: 16px 4px 4px;
+}
+
+.recipe-modal-notes {
+  margin-top: 16px;
+  padding: 16px 4px 4px;
+  border-top: 1px solid var(--border);
+}
+
+.recipe-modal-notes .notes-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.recipe-modal-notes p {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.subhead {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  margin: 28px 0 8px;
+  text-transform: uppercase;
+}
+
+/* Selects reuse the underline input look */
+.field select,
+.training-name-wrap select {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  outline: none;
+  width: 100%;
+}
+.field select option,
+.training-name-wrap select option {
+  background: #040d14;
+  color: var(--text);
+}
+.field select:focus,
+.training-name-wrap select:focus {
+  border-bottom-color: var(--cyan);
+}
+
+/* ── EgoLifter VIP panel ─────────────────────────────── */
+/* Full-bleed: cancel the .main-content padding (40px 48px) so the VIP page
+   spans the entire screen instead of the shared 980px column. */
+.egolifter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  max-width: none;
+  margin: -40px -48px;
+}
+
+/* Non-hero sections get the horizontal inset back so their text lines up. */
+.vip-how,
+.vip-features {
+  padding: 0 48px;
+}
+
+.vip-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px 48px;
+  text-align: center;
+  border: 1px solid rgba(255, 211, 77, 0.45);
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 211, 77, 0.14), transparent 70%),
+    var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 30px rgba(255, 211, 77, 0.18), inset 0 0 24px rgba(255, 211, 77, 0.05);
+  animation: vipHeroGlow 3s ease-in-out infinite;
+}
+
+.vip-lead {
+  max-width: 720px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  color: var(--text);
+  text-shadow: 0 0 14px rgba(255, 211, 77, 0.2);
+}
+
+@keyframes vipHeroGlow {
+  0%, 100% { box-shadow: 0 0 30px rgba(255, 211, 77, 0.18), inset 0 0 24px rgba(255, 211, 77, 0.05); }
+  50%      { box-shadow: 0 0 52px rgba(255, 211, 77, 0.34), inset 0 0 30px rgba(255, 211, 77, 0.09); }
+}
+
+.vip-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 5px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 211, 77, 0.8);
+  border: 1px solid rgba(255, 211, 77, 0.5);
+  background: rgba(255, 211, 77, 0.08);
+  padding: 6px 16px;
+  border-radius: 2px;
+}
+
+.vip-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 8px;
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(255, 211, 77, 0.7), 0 0 40px rgba(255, 211, 77, 0.3);
+}
+
+.vip-title span {
+  display: block;
+  font-size: 18px;
+  letter-spacing: 16px;
+  color: rgba(255, 211, 77, 0.7);
+  margin-top: 8px;
+}
+
+.vip-tagline {
+  max-width: 680px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.vip-perks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.vip-perk {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 16px;
+  background: var(--card-bg);
+  border: 1px solid rgba(255, 211, 77, 0.3);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 16px rgba(255, 211, 77, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.vip-perk:hover {
+  border-color: rgba(255, 211, 77, 0.6);
+  box-shadow: 0 0 22px rgba(255, 211, 77, 0.18);
+}
+
+.vip-perk-icon {
+  font-size: 22px;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 211, 77, 0.7);
+  line-height: 1.2;
+}
+
+.vip-perk-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.vip-perk-desc {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vip-cta {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  padding: 13px 32px;
+  border: 1px solid var(--gold);
+  border-radius: 2px;
+  background: linear-gradient(135deg, var(--gold), #ff9d2f);
+  color: #2a1d00;
+  cursor: pointer;
+  transition: box-shadow 0.25s, transform 0.15s;
+  box-shadow: 0 0 18px rgba(255, 211, 77, 0.4);
+}
+
+.vip-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(255, 211, 77, 0.7), 0 6px 20px rgba(255, 211, 77, 0.3);
+}
+
+/* ── VIP sections (How it works / What you unlock) ───── */
+.vip-section-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--gold);
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(255, 211, 77, 0.5);
+  margin-bottom: 20px;
+}
+
+.vip-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.vip-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 22px 20px;
+  background: var(--card-bg);
+  border: 1px solid rgba(255, 211, 77, 0.3);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 16px rgba(255, 211, 77, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.vip-step:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 211, 77, 0.6);
+  box-shadow: 0 0 24px rgba(255, 211, 77, 0.18);
+}
+
+.vip-step-num {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+  color: rgba(255, 211, 77, 0.35);
+  text-shadow: 0 0 16px rgba(255, 211, 77, 0.25);
+}
+
+.vip-step-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.vip-step-desc {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ── VIP closing CTA band ────────────────────────────── */
+.vip-closing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 72px 48px;
+  text-align: center;
+  border-top: 1px solid rgba(255, 211, 77, 0.45);
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 211, 77, 0.12), transparent 70%),
+    var(--card-bg);
+  box-shadow: inset 0 0 30px rgba(255, 211, 77, 0.05);
+}
+
+.vip-closing-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(255, 211, 77, 0.6), 0 0 40px rgba(255, 211, 77, 0.25);
+}
+
+/* ── Settings panel ──────────────────────────────────── */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 980px;
+}
+
+/* ── Analytics panel ─────────────────────────────────── */
+.analytics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  max-width: 980px;
+}
+
+/* Give each subhead a little extra breathing room above the block it introduces,
+   plus a small padding below so the label isn't crowding its boxes/table. */
+.analytics-panel .subhead {
+  margin: 12px 0 10px;
+}
+
+.analytics-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analytics-table .data-row {
+  padding: 18px 4px;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 24px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 16px rgba(0, 245, 255, 0.05), inset 0 0 16px rgba(0, 245, 255, 0.02);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  border-color: rgba(0, 245, 255, 0.55);
+  box-shadow: 0 0 24px rgba(0, 245, 255, 0.1), inset 0 0 16px rgba(0, 245, 255, 0.03);
+}
+
+.stat-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 26px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.6);
+}
+
+.stat-unit {
+  font-size: 12px;
+  color: var(--muted);
+  text-shadow: none;
+}
+
+/* ── EgoLifter bot chat ──
+   Two columns inside .main-content: a wide chat in the center and a narrower
+   history panel on the right. calc(100vh - 80px) fills the .main-content
+   padded box (flex:1 of a 100vh body, padding 40px 48px) so each column
+   scrolls internally instead of the page double-scrolling. */
+.egobot-panel {
+  display: flex;
+  gap: 24px;
+  height: calc(100vh - 80px);
+}
+
+/* Center column — the conversation. Takes the majority of the width. */
+.egobot-chat {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.egobot-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.egobot-newchat {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 9px 18px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.25s, border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+
+.egobot-newchat:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px rgba(0, 245, 255, 0.3);
+}
+
+.egobot-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 16px 8px 2px;
+  scroll-behavior: smooth;
+}
+
+/* User turn — compact cyan bubble, right-aligned. */
+.egobot-msg {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.egobot-msg.user {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 12px 16px;
+  background: rgba(0, 245, 255, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  box-shadow: inset 0 0 14px rgba(0, 245, 255, 0.04);
+}
+
+/* Assistant turn — full-width, labelled, no bubble. */
+.egobot-msg.assistant {
+  align-self: stretch;
+  color: var(--text);
+}
+
+.egobot-msg-label {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+
+.egobot-typing {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Composer — pinned to the bottom of the chat column. */
+.egobot-composer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.egobot-input {
+  flex: 1 1 auto;
+  width: 100%;
+  max-height: 160px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 2px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  caret-color: var(--cyan);
+  transition: border-color 0.2s, text-shadow 0.2s;
+}
+
+.egobot-input:focus {
+  border-bottom-color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+
+.egobot-send {
+  flex: 0 0 auto;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 11px 24px;
+  border: 1px solid var(--cyan);
+  border-radius: 2px;
+  background: var(--cyan);
+  color: #020c12;
+  cursor: pointer;
+  transition: box-shadow 0.25s, transform 0.15s, opacity 0.2s;
+}
+
+.egobot-send:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(0, 245, 255, 0.5);
+}
+
+.egobot-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Right column — chat history, narrower than the chat. */
+.egobot-history {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+
+.egobot-history-title {
+  flex: 0 0 auto;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--cyan);
+  margin-bottom: 16px;
+}
+
+.egobot-history-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.egobot-history-empty {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  padding: 16px 4px;
+}
+
+.egobot-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.egobot-history-item:hover {
+  background: rgba(0, 245, 255, 0.06);
+  border-color: var(--border);
+}
+
+.egobot-history-item.active {
+  background: rgba(0, 245, 255, 0.1);
+  border-color: var(--cyan);
+}
+
+.egobot-history-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.egobot-history-item:hover .egobot-history-name,
+.egobot-history-item.active .egobot-history-name {
+  color: var(--cyan);
+}
+
+/* The red delete button on each history row. */
+.egobot-history-del {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--error);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.egobot-history-del:hover {
+  background: rgba(255, 77, 109, 0.12);
+  border-color: var(--error);
+  box-shadow: 0 0 12px rgba(255, 77, 109, 0.4);
+}

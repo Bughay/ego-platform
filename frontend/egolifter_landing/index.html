@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EgoLifter, Your Smart Training and Nutrition Coach</title>
+  <meta name="description" content="EgoLifter is a cyberpunk fitness companion with a smart AI coach that builds your training and nutrition plan, fills your log, and adapts every week." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="bg"></canvas>
+
+  <!-- ── Top nav ───────────────────────────────────────── -->
+  <header class="lp-nav" id="nav">
+    <div class="lp-nav-inner">
+      <a class="lp-wordmark" href="#top">EGOLIFTER</a>
+
+      <nav class="lp-nav-links" id="navLinks">
+        <a href="#coach">Coach</a>
+        <a href="#features">Features</a>
+        <a href="#manual">Manual</a>
+        <a href="#how">How It Works</a>
+        <a href="#connect">Connect</a>
+        <a class="btn btn-primary lp-nav-cta" href="../egolifter/">Launch App</a>
+      </nav>
+
+      <button class="lp-nav-toggle" id="navToggle" type="button" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── Hero ────────────────────────────────────────── -->
+    <section class="lp-hero snap-section" id="top">
+      <div class="lp-container lp-hero-inner reveal">
+        <div class="lp-badge">★ AI POWERED COACH</div>
+        <h1 class="lp-hero-title">Your smart EgoLifter coach for training and nutrition</h1>
+        <p class="lp-hero-lead">
+          Tell EgoLifter your goal and it does the heavy lifting. It builds your training
+          program, sets your daily calories and macros, fills your log with the right foods
+          and routines, then checks in every week and adapts.
+        </p>
+        <div class="lp-hero-actions">
+          <a class="btn btn-primary" href="../login/">Get Started</a>
+          <a class="btn btn-outline" href="#how">See How It Works</a>
+        </div>
+        <p class="lp-hero-note">No spreadsheets. No guesswork. Just your plan, ready to go.</p>
+      </div>
+      <a class="lp-scroll-cue" href="#coach" aria-label="Scroll to the coach section">▾</a>
+    </section>
+
+    <!-- ── The Coach (centerpiece) ─────────────────────── -->
+    <section class="lp-coach snap-section" id="coach">
+      <div class="lp-container">
+        <div class="lp-section-head reveal">
+          <div class="lp-eyebrow lp-eyebrow-gold">The Coach</div>
+          <h2 class="lp-section-title">A coach that builds and runs your plan</h2>
+          <p class="lp-section-sub">
+            EgoLifter asks about your goal, your stats and how you like to train. Then it
+            designs a complete training program and a nutrition plan dialed to your exact
+            daily calories and macros, and creates everything inside your app for you.
+          </p>
+        </div>
+
+        <div class="lp-coach-grid">
+          <!-- Mock chat that makes the assistant tangible -->
+          <div class="lp-chat reveal">
+            <div class="lp-chat-head">
+              <span class="lp-chat-dot"></span>
+              <span class="lp-chat-name">EGOLIFTER COACH</span>
+              <span class="lp-chat-status">online</span>
+            </div>
+            <div class="lp-chat-body">
+              <div class="lp-msg lp-msg-user">
+                <p>I want to gain muscle. I can train 4 days a week and I am vegetarian.</p>
+              </div>
+              <div class="lp-msg lp-msg-coach">
+                <p>Locked in. Your daily target is 2,650 kcal with 185g protein.</p>
+              </div>
+              <div class="lp-msg lp-msg-coach">
+                <p>I built a 4 day upper and lower split, added 14 vegetarian foods and 3 high protein recipes to your log. Want to start today?</p>
+              </div>
+              <div class="lp-msg lp-msg-user">
+                <p>Yes, let us go.</p>
+              </div>
+            </div>
+            <div class="lp-chat-foot">
+              <span class="lp-chat-input">Ask your coach anything</span>
+              <span class="lp-chat-send">SEND</span>
+            </div>
+          </div>
+
+          <!-- Capability cards -->
+          <div class="lp-coach-caps">
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">◎</div>
+              <div>
+                <h3>Sets your goals</h3>
+                <p>Tell it what you want, whether that is building muscle, losing fat or getting stronger, plus your stats and preferences.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">◴</div>
+              <div>
+                <h3>Builds your plan</h3>
+                <p>A full training program and a nutrition plan with the exact daily calories and macros for your goal.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">⚙</div>
+              <div>
+                <h3>Fills your app</h3>
+                <p>Your foods, recipes and training routines are created for you, ready to log from day one.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">✓</div>
+              <div>
+                <h3>Weekly check-ins</h3>
+                <p>Share a quick weekly update and the coach reads your progress against the plan.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">↻</div>
+              <div>
+                <h3>Adapts your plan</h3>
+                <p>Calories and training volume are recalibrated every week based on real results, not guesswork.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">⚡</div>
+              <div>
+                <h3>AI weekly reports</h3>
+                <p>Get a clear report on your training and nutrition trends, with the next steps spelled out.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Features (the app) ──────────────────────────── -->
+    <section class="lp-features snap-section" id="features">
+      <div class="lp-container">
+        <div class="lp-section-head reveal">
+          <div class="lp-eyebrow">The App</div>
+          <h2 class="lp-section-title">Everything your coach fills in for you</h2>
+          <p class="lp-section-sub">
+            The coach does the work, but the full app is yours to control. Track, build and
+            review every part of your training and nutrition.
+          </p>
+        </div>
+
+        <div class="lp-feature-grid">
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">🍎</div>
+            <h3>Nutrition</h3>
+            <p>
+              Build your own food database with macros stored per 100g. Log a meal by saying
+              what you ate and how many grams, and the calories, protein, carbs and fat totals
+              are computed for you automatically.
+            </p>
+          </article>
+
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">🏋</div>
+            <h3>Training</h3>
+            <p>
+              Create reusable workout routines, then log workouts as they happen. Every
+              exercise records its working weight in kilograms and reps, and you can review
+              any single day or a full date range.
+            </p>
+          </article>
+
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">🥘</div>
+            <h3>Recipes</h3>
+            <p>
+              Compose recipes from the foods already in your database, with a gram weight per
+              ingredient. The nutrition of a full dish is always derived from its parts, so
+              your numbers stay honest.
+            </p>
+          </article>
+
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">📊</div>
+            <h3>Analytics</h3>
+            <p>
+              Pick a date range and see a clean summary of your training and diet: macro
+              totals, daily averages, days logged, workout count, total reps and training
+              volume.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Manual (do it yourself) ─────────────────────── -->
+    <section class="lp-manual snap-section" id="manual">
+      <div class="lp-container">
+        <div class="lp-section-head reveal">
+          <div class="lp-eyebrow">Manual Mode</div>
+          <h2 class="lp-section-title">Log, create and analyze it yourself</h2>
+          <p class="lp-section-sub">
+            Prefer to drive? You are always in full control. Log, create and analyze every
+            part of your training, nutrition and recipes by hand. The coach is there when you
+            want it and out of your way when you do not.
+          </p>
+        </div>
+
+        <div class="lp-feature-grid">
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">📝</div>
+            <h3>Log</h3>
+            <p>
+              Record your meals, workouts and daily intake as you go. Enter a food and how
+              many grams and your calories and macros are totaled for you, the same for every
+              workout you finish.
+            </p>
+          </article>
+
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">🛠</div>
+            <h3>Create</h3>
+            <p>
+              Build your own food database, compose recipes from those foods by gram weight,
+              and design reusable training routines, all by hand and saved to your account.
+            </p>
+          </article>
+
+          <article class="lp-feature reveal">
+            <div class="lp-feature-icon">📈</div>
+            <h3>Analyze</h3>
+            <p>
+              Pick any date range and review your training and nutrition together: macro
+              totals, daily averages, days logged, workout count, total reps and training
+              volume.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── How it works ────────────────────────────────── -->
+    <section class="lp-how snap-section" id="how">
+      <div class="lp-container">
+        <div class="lp-section-head reveal">
+          <div class="lp-eyebrow lp-eyebrow-gold">How It Works</div>
+          <h2 class="lp-section-title">From goal to plan in minutes</h2>
+        </div>
+
+        <div class="lp-steps">
+          <div class="lp-step reveal">
+            <div class="lp-step-num">01</div>
+            <h3>Set your goals</h3>
+            <p>Tell your coach your goal, your stats, your experience and your food preferences.</p>
+          </div>
+          <div class="lp-step reveal">
+            <div class="lp-step-num">02</div>
+            <h3>Get your custom plan</h3>
+            <p>It designs your training program and a nutrition plan with exact daily calories and macros.</p>
+          </div>
+          <div class="lp-step reveal">
+            <div class="lp-step-num">03</div>
+            <h3>Auto filled for you</h3>
+            <p>Your foods, recipes and training routines are created inside EgoLifter, ready to log.</p>
+          </div>
+          <div class="lp-step reveal">
+            <div class="lp-step-num">04</div>
+            <h3>Weekly check-ins</h3>
+            <p>Share a quick weekly update and the coach reviews your progress and adjusts the plan.</p>
+          </div>
+          <div class="lp-step reveal">
+            <div class="lp-step-num">05</div>
+            <h3>AI weekly reports</h3>
+            <p>Receive a generated report on your trends with clear next steps for the week ahead.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Connect (integrations) ──────────────────────── -->
+    <section class="lp-connect snap-section" id="connect">
+      <div class="lp-container">
+        <div class="lp-section-head reveal">
+          <div class="lp-eyebrow">Connect</div>
+          <h2 class="lp-section-title">Use EgoLifter from anywhere</h2>
+          <p class="lp-section-sub">
+            Your account connects to the tools you already use. Log from the web app or chat
+            with our Telegram bot, and get your weekly reports by email or saved straight to
+            Google Drive.
+          </p>
+        </div>
+
+        <div class="lp-coach-grid">
+          <!-- Telegram chat mock -->
+          <div class="lp-chat lp-chat-tg reveal">
+            <div class="lp-chat-head">
+              <span class="lp-chat-dot"></span>
+              <span class="lp-chat-name">EGOLIFTER BOT</span>
+              <span class="lp-chat-status">Telegram</span>
+            </div>
+            <div class="lp-chat-body">
+              <div class="lp-msg lp-msg-user">
+                <p>I just ate a meal of eggs, milk and sausages.</p>
+              </div>
+              <div class="lp-msg lp-msg-coach">
+                <p>Nice. How many grams of each?</p>
+              </div>
+              <div class="lp-msg lp-msg-user">
+                <p>150g eggs, 200g milk, 100g sausages.</p>
+              </div>
+              <div class="lp-msg lp-msg-coach">
+                <p>Logged. That meal is 635 kcal, 38g protein, 11g carbs and 47g fat.</p>
+              </div>
+            </div>
+            <div class="lp-chat-foot">
+              <span class="lp-chat-input">Message your EgoLifter bot</span>
+              <span class="lp-chat-send">SEND</span>
+            </div>
+          </div>
+
+          <!-- Interaction channels -->
+          <div class="lp-coach-caps">
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">▣</div>
+              <div>
+                <h3>Web App</h3>
+                <p>Log, create and analyze right here in the EgoLifter dashboard, the full experience in your browser.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">✈</div>
+              <div>
+                <h3>Telegram Bot</h3>
+                <p>Message the bot in plain language and it logs your meals and workouts for you, no forms to fill in.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">✉</div>
+              <div>
+                <h3>Email Reports</h3>
+                <p>Your weekly progress reports land straight in your inbox, ready to read.</p>
+              </div>
+            </div>
+            <div class="lp-cap reveal">
+              <div class="lp-cap-icon">☁</div>
+              <div>
+                <h3>Google Drive</h3>
+                <p>Your reports are saved to your Google Drive automatically, archived and easy to share.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Closing CTA and footer (final screen) ───────── -->
+    <section class="lp-closing snap-section" id="join">
+      <div class="lp-container lp-closing-inner reveal">
+        <h2 class="lp-closing-title">Ready to meet your coach?</h2>
+        <p class="lp-closing-sub">Wake up, samurai. Your training and nutrition are about to get a lot smarter.</p>
+        <a class="btn btn-gold" href="../login/">Get Started</a>
+      </div>
+
+      <footer class="lp-footer">
+        <div class="lp-container lp-footer-inner">
+          <div class="lp-footer-brand">
+            <div class="lp-wordmark">EGOLIFTER</div>
+            <p>Your smart coach for training and nutrition.</p>
+          </div>
+          <nav class="lp-footer-links">
+            <a href="#coach">Coach</a>
+            <a href="#features">Features</a>
+            <a href="#manual">Manual</a>
+            <a href="#how">How It Works</a>
+            <a href="#connect">Connect</a>
+            <a href="../login/">Sign Up</a>
+            <a href="../egolifter/">Launch App</a>
+          </nav>
+        </div>
+        <div class="lp-footer-base">EgoLifter. Built for operators who count every rep and every macro.</div>
+      </footer>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

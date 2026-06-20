@@ -1,0 +1,121 @@
+[
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_plan",
+            "description": "Reads the plan.md file and returns its contents for analysis",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "args": {
+                        "type": "string",
+                        "description": "Optional arguments (not used, can be empty string)"
+                    }
+                },
+                "required": ["args"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_html",
+            "description": "Reads the index.html file and returns its contents for analysis",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "args": {
+                        "type": "string",
+                        "description": "Optional arguments (not used, can be empty string)"
+                    }
+                },
+                "required": ["args"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_css",
+            "description": "Reads the styles.css file and returns its contents for analysis",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "args": {
+                        "type": "string",
+                        "description": "Optional arguments (not used, can be empty string)"
+                    }
+                },
+                "required": ["args"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_js",
+            "description": "Reads the script.js file and returns its contents for analysis",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "args": {
+                        "type": "string",
+                        "description": "Optional arguments (not used, can be empty string)"
+                    }
+                },
+                "required": ["args"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_html",
+            "description": "Writes content to index.html file (creates or overwrites existing file)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "HTML content to write to index.html"
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_css",
+            "description": "Writes content to styles.css file (creates or overwrites existing file)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "CSS content to write to styles.css"
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_js",
+            "description": "Writes content to script.js file (creates or overwrites existing file)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "JavaScript content to write to script.js"
+                    }
+                },
+                "required": ["content"]
+            }
+        }
+    }
+]

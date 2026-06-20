@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EGOAI</title>
+
+  <!-- Fonts: Orbitron (headings/buttons) + Share Tech Mono (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Markdown rendering + syntax highlighting + sanitization (CDN) -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Animated glowing-orb background (cyberpunk atmosphere) -->
+  <canvas id="bg"></canvas>
+
+  <!-- Collapsible left sidebar: AI parameter controls -->
+  <aside id="sidebar" class="sidebar card collapsed">
+    <!-- 0 — Model -->
+    <section class="side-section">
+      <label class="side-label" for="modelSelect">Model</label>
+      <div class="model-field">
+        <select id="modelSelect" class="model-select" aria-label="Model">
+          <option value="deepseek-pro">DeepSeek Pro</option>
+          <option value="deepseek-flash">DeepSeek Flash</option>
+          <option value="grok">Grok 4.3</option>
+          <option value="grok-websearch">Grok Websearch</option>
+        </select>
+      </div>
+      <button
+        type="button"
+        id="thinkingToggle"
+        class="thinking-btn"
+        aria-pressed="false"
+        data-tooltip="Run DeepSeek in reasoning mode. Slower but can be more thorough. (DeepSeek models only.)"
+        aria-label="Toggle DeepSeek thinking mode"
+      >
+        <span class="thinking-btn__led" aria-hidden="true"></span>
+        <span class="thinking-btn__text">Thinking</span>
+        <span class="thinking-btn__state">OFF</span>
+      </button>
+    </section>
+
+    <!-- 1 — System Prompt -->
+    <section class="side-section">
+      <label class="side-label" for="sysPrompt">System Prompt</label>
+      <textarea
+        id="sysPrompt"
+        class="side-textarea"
+        rows="4"
+        placeholder="Set a system prompt…"
+        autocomplete="off"
+      ></textarea>
+      <div id="sysPromptCount" class="char-count">0 chars</div>
+    </section>
+
+    <!-- 2 — Parameters -->
+    <section class="side-section">
+      <div class="param">
+        <div class="param-head">
+          <label class="side-label" for="temp">
+            Temperature
+            <span
+              class="info"
+              data-tooltip="Controls randomness. Lower = more focused, higher = more creative."
+              aria-label="Controls randomness. Lower = more focused, higher = more creative."
+            >&#9432;</span>
+          </label>
+          <span id="tempVal" class="param-val">1.0</span>
+        </div>
+        <input type="range" id="temp" class="slider" min="0" max="1" step="0.1" value="1" />
+      </div>
+
+      <div class="param">
+        <div class="param-head">
+          <label class="side-label" for="maxTok">
+            Max Tokens
+            <span
+              class="info"
+              data-tooltip="Maximum length of the model's response."
+              aria-label="Maximum length of the model's response."
+            >&#9432;</span>
+          </label>
+          <span id="maxTokVal" class="param-val">2048</span>
+        </div>
+        <input type="range" id="maxTok" class="slider" min="0" max="100000" step="256" value="2048" />
+      </div>
+    </section>
+
+    <!-- 3 — Reset -->
+    <section class="side-section">
+      <button id="resetBtn" class="btn btn-outline reset-btn" type="button">Reset defaults</button>
+    </section>
+
+    <!-- Services launcher (UI only for now — will open deep research, agents, web search, etc.) -->
+    <section class="side-section">
+      <button id="servicesBtn" class="btn btn-primary services-btn" type="button">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path fill="currentColor" d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" />
+        </svg>
+        Services
+      </button>
+    </section>
+
+    <!-- 4 — Conversation History -->
+    <div class="divider"></div>
+    <section class="side-section history-section">
+      <span class="side-label">History</span>
+      <div id="historyList" class="history-list"></div>
+    </section>
+  </aside>
+
+  <!-- Main column: header + chat + composer -->
+  <div class="main">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <button id="sidebarToggle" class="icon-btn" type="button" aria-label="Toggle sidebar">
+          <!-- chevron -->
+          <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="2.4"
+              stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+        <div class="brand">
+          <span class="logo">EGO</span>
+          <h1>EGOAI</h1>
+        </div>
+        <button id="newChatBtn" class="btn btn-outline newchat-btn" type="button">
+          <!-- plus -->
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="2.4"
+              stroke-linecap="round" d="M12 5v14M5 12h14" />
+          </svg>
+          New chat
+        </button>
+      </div>
+      <button id="logoutBtn" class="btn btn-outline" type="button">Logout</button>
+    </header>
+
+    <!-- Chat container -->
+    <main class="chat card">
+      <div id="messages" class="messages"></div>
+    </main>
+
+    <!-- Fixed bottom input area -->
+    <footer class="composer-wrap">
+      <div class="composer card">
+        <textarea
+          id="input"
+          class="composer-input"
+          rows="1"
+          placeholder="Message EGOAI…"
+          autocomplete="off"
+        ></textarea>
+        <button id="sendBtn" class="btn btn-primary send-btn" type="button" aria-label="Send">
+          <!-- paper-plane -->
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+          </svg>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Shared platform auth/API client (single login across all Ego apps). Must load before script.js. -->
+  <script src="../shared/api.js" defer></script>
+  <script src="script.js" defer></script>
+</body>
+</html>

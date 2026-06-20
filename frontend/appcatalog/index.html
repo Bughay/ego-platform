@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APP CATALOG — EGO</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="catalog-page">
+
+  <header class="catalog-header">
+    <div class="header-left">
+      <div class="logo">Ego AI</div>
+      <h1>APP CATALOG</h1>
+      <div class="divider"></div>
+    </div>
+    <div class="header-right">
+      <span class="operator-label">OPERATOR: <span id="username">USER</span></span>
+      <button class="btn btn-outline btn-sm" id="btnLogout">LOGOUT</button>
+    </div>
+  </header>
+
+  <main class="catalog-grid">
+
+    <div class="app-card" data-app="app-one">
+      <div class="app-icon"><span>EL</span></div>
+      <div class="app-status"><span class="status-dot"></span>ONLINE</div>
+      <h2 class="app-name">EGOLIFTER</h2>
+      <p class="app-desc">Fitness app to track training and nutrition. Log workouts, monitor macros, and analyse your progress in one place.</p>
+      <button class="btn btn-primary launch-btn" data-app="EGOLIFTER">LAUNCH</button>
+    </div>
+
+    <div class="app-card" data-app="app-two">
+      <div class="app-icon"><span>AI</span></div>
+      <div class="app-status"><span class="status-dot"></span>ONLINE</div>
+      <h2 class="app-name">EGO AI STUDIO</h2>
+      <p class="app-desc">AI chat studio powered by DeepSeek. Hold a conversation and build vanilla HTML/CSS/JS frontends with an autonomous agent.</p>
+      <button class="btn btn-primary launch-btn" data-app="EGO_AI_STUDIO">LAUNCH</button>
+    </div>
+
+    <div class="app-card offline" data-app="app-three">
+      <div class="app-icon"><span>III</span></div>
+      <div class="app-status"><span class="status-dot offline"></span>OFFLINE</div>
+      <h2 class="app-name">APPLICATION THREE</h2>
+      <p class="app-desc">Coming soon.</p>
+      <button class="btn btn-disabled launch-btn" disabled>OFFLINE</button>
+    </div>
+
+    <div class="app-card offline" data-app="app-four">
+      <div class="app-icon"><span>IV</span></div>
+      <div class="app-status"><span class="status-dot offline"></span>OFFLINE</div>
+      <h2 class="app-name">APPLICATION FOUR</h2>
+      <p class="app-desc">Coming soon.</p>
+      <button class="btn btn-disabled launch-btn" disabled>OFFLINE</button>
+    </div>
+
+  </main>
+
+  <footer class="catalog-footer">SECURE CHANNEL &nbsp;|&nbsp; ENCRYPTED &nbsp;|&nbsp; EGO PLATFORM</footer>
+
+</div>
+
+<script src="../shared/api.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

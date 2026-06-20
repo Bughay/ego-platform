@@ -1,0 +1,206 @@
+[
+    {
+        "type": "function",
+        "function": {
+            "name": "list_foods",
+            "description": "List the user's food catalog. Each food has an \"id\", a \"name\", and per-100g macros (calories_100, protein_100, carbohydrates_100, fat_100). Use the returned \"id\" as the food_id when building a recipe with create_recipe.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_foods",
+            "description": "Add one or more foods to the user's catalog in a single transaction and get them back (each including its new \"id\", in the same order). Always pass an array, even for a single food. Use this when foods a recipe needs are not already in the catalog, then reference the returned ids as food_id values in create_recipe. All macro values are per 100 grams of the food.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "foods": {
+                        "type": "array",
+                        "description": "The foods to add (at least one). Each item is a JSON object {\"name\": string, \"calories_100\": number, \"protein_100\": number, \"carbohydrates_100\": number, \"fat_100\": number}. All macro values are per 100 grams of the food."
+                    }
+                },
+                "required": ["foods"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_meal",
+            "description": "Log a meal the user ate. Records the meal and its foods; the totals feed the nutrition summary.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The meal's name, e.g. \"Breakfast\"."
+                    },
+                    "foods": {
+                        "type": "array",
+                        "description": "The foods in the meal (at least one). Each item is a JSON object {\"name\": string, \"weight_g\": number > 0, \"calories\": number, \"protein\": number, \"carbohydrates\": number, \"fat\": number}. The macro values are TOTALS for the given weight_g, not per-100g."
+                    }
+                },
+                "required": ["name", "foods"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_meals",
+            "description": "List the user's logged meals, each with its foods and macro totals. Omit the date fields to get all meals, or pass a date range to filter.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {
+                        "type": "string",
+                        "description": "Optional start date, YYYY-MM-DD. Omit or pass \"\" to list all meals."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Optional end date, YYYY-MM-DD. Omit or pass \"\" to list all meals."
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "log_workout",
+            "description": "Log a workout the user performed. Records the exercises with weight and reps; the totals feed the training summary.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "routine_id": {
+                        "type": "string",
+                        "description": "Optional. Pass \"\" for an ad-hoc workout, or an id from list_routines to log a saved routine."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The workout's name, e.g. \"Push day\"."
+                    },
+                    "exercises": {
+                        "type": "array",
+                        "description": "The exercises performed (at least one). Each item is a JSON object {\"name\": string, \"weight_kg\": number (0 or more), \"reps\": integer (1 or more)}."
+                    }
+                },
+                "required": ["name", "exercises"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_workouts",
+            "description": "List the workouts the user actually performed, each with its exercises (weight and reps). Omit the date fields for today's workouts, or pass a date range (e.g. for \"this week\").",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {
+                        "type": "string",
+                        "description": "Optional start date, YYYY-MM-DD. Omit or pass \"\" for today."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Optional end date, YYYY-MM-DD. Omit or pass \"\" for today."
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_routines",
+            "description": "List the user's saved workout routines (reusable templates), each with its id, name, and entries. Pass a routine's id as routine_id to log_workout to log that saved routine.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_recipe",
+            "description": "Create a recipe built from foods already in the catalog. Every ingredient must reference an existing food by its food_id — get these from list_foods, or create the foods first with create_foods. Do not invent food_id values.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The recipe's name."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Optional free-text notes for the recipe."
+                    },
+                    "ingredients": {
+                        "type": "array",
+                        "description": "The recipe's ingredients (at least one). Each item is a JSON object {\"food_id\": string (from list_foods/create_foods, never invented), \"weight_g\": number > 0, \"notes\": string (optional)}."
+                    }
+                },
+                "required": ["name", "ingredients"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_recipes",
+            "description": "List the user's recipes, each with its id, name, notes, and ingredients (the foods and their weights). Use this to find a recipe's id by name before calling get_recipe.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_recipe",
+            "description": "Get a single recipe by id, with its ingredients (foods) and notes. Find the id with list_recipes first.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The recipe id, obtained from list_recipes."
+                    }
+                },
+                "required": ["id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_summary",
+            "description": "Get a combined nutrition + training summary (calories, macros, sets, reps, volume) over an inclusive YYYY-MM-DD date range.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date_from": {
+                        "type": "string",
+                        "description": "Start date, YYYY-MM-DD. Empty (\"\") defaults to today."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "End date, YYYY-MM-DD. Empty (\"\") defaults to today."
+                    }
+                },
+                "required": []
+            }
+        }
+    }
+]
