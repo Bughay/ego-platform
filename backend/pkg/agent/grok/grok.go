@@ -39,9 +39,20 @@ const (
 // connection every time.
 var httpClient = &http.Client{Timeout: apiTimeout}
 
+// Message is one chat turn. Role/Content cover ordinary turns; the two optional
+// fields carry the native tool-calling protocol used by the ReAct agent:
+//   - ToolCalls is set on an assistant turn that asked to call one or more tools.
+//   - ToolCallID is set on a role:"tool" turn and links its Content (the tool's
+//     result) back to the matching ToolCall.ID.
+//
+// Both use omitempty, so a plain {Role, Content} message serializes exactly as
+// before and never sends the tool fields on the wire (the reasoning/JSON/web
+// search call styles are unaffected).
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
 }
 
 type ChatTemplate struct {
@@ -60,16 +71,36 @@ type ChatTemplate struct {
 	// Note: Grok has no extra_body/thinking concept like DeepSeek — reasoning is
 	// controlled solely by this field.
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`
+	// Tools carries the function-calling tool definitions. When set, the model
+	// may answer with structured tool_calls instead of (or alongside) plain
+	// content. omitempty keeps it off the wire for plain chat calls.
+	Tools []Tool `json:"tools,omitempty"`
+	// ToolChoice steers tool use ("auto" / "none" / "required"). Only sent when
+	// Tools is set; omitempty leaves it out otherwise.
+	ToolChoice string `json:"tool_choice,omitempty"`
 }
 
 type ResponseFormat struct {
 	Type string `json:"type"`
 }
 
+// ToolCall is one function call the model asked for in its response. Arguments
+// is a JSON object string (e.g. `{"id":"..."}`), passed verbatim to the matching
+// tool handler.
+type ToolCall struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
 type ChatResponse struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string     `json:"content"`
+			ToolCalls []ToolCall `json:"tool_calls"`
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
@@ -244,6 +275,58 @@ func buildJSONChat(model string, messages []Message, temperature float64, maxTok
 		ResponseFormat:      &ResponseFormat{Type: "json_object"},
 		ReasoningEffort:     "none",
 	}
+}
+
+// applyThinking turns the request into a reasoning ("thinking") call by setting
+// reasoning_effort to "high" (Grok's analog of DeepSeek's "max"), or leaves it a
+// plain non-thinking call when thinking is false. Centralizes the single
+// definition of "thinking" so callers just pass a bool. Unlike DeepSeek, Grok
+// has no extra_body/thinking field — reasoning is controlled solely here.
+func applyThinking(chat *ChatTemplate, thinking bool) {
+	if thinking {
+		chat.ReasoningEffort = "high"
+	}
+}
+
+// buildToolChat builds the request for the agent's tools-enabled call. Tools and
+// tool_choice are only set when at least one tool is supplied, so a tool-less
+// agent degrades to a plain content call. reasoning_effort is "high" when
+// thinking is requested (see applyThinking). No response_format is set — we want
+// natural content alongside tool_calls, not a JSON object.
+func buildToolChat(model string, messages []Message, temperature float64, maxTokens int, tools []Tool, thinking bool) *ChatTemplate {
+	chat := &ChatTemplate{
+		Model:               model,
+		Messages:            messages,
+		Stream:              false,
+		Temperature:         &temperature,
+		MaxCompletionTokens: maxTokens,
+	}
+	if len(tools) > 0 {
+		chat.Tools = tools
+		chat.ToolChoice = "auto"
+	}
+	applyThinking(chat, thinking)
+	return chat
+}
+
+// grokToolCall makes a tools-enabled chat call and returns the assistant
+// message's content (the model's reasoning / brief note), any structured
+// tool_calls it asked for, and the finish_reason. This is the one and only model
+// call the agent makes: the model is given the tools parameter (tool_choice
+// "auto") and answers with content + tool_calls together. Mirrors the DeepSeek
+// client's deepseekToolCall; Grok differs only in the token field
+// (max_completion_tokens) and the reasoning control (reasoning_effort "high").
+func grokToolCall(ctx context.Context, model string, messages []Message, temperature float64, maxTokens int, tools []Tool, thinking bool) (string, []ToolCall, string, error) {
+	resp, err := doRequest(ctx, buildToolChat(model, messages, temperature, maxTokens, tools, thinking))
+	if err != nil {
+		return "", nil, "", err
+	}
+
+	choice := resp.Choices[0]
+	if choice.FinishReason == "length" {
+		return "", nil, "length", fmt.Errorf("output truncated due to max_completion_tokens limit (current: %d)", maxTokens)
+	}
+	return choice.Message.Content, choice.Message.ToolCalls, choice.FinishReason, nil
 }
 
 // doRequest performs a single Grok chat-completion HTTP call and returns the

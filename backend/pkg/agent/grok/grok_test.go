@@ -152,6 +152,65 @@ func TestBuildWebSearchResponses(t *testing.T) {
 	}
 }
 
+func TestBuildToolChat(t *testing.T) {
+	tools := []Tool{{
+		Type: "function",
+		Function: Function{
+			Name:        "list_foods",
+			Description: "list foods",
+			Parameters:  Parameters{Type: "object"},
+		},
+	}}
+	messages := []Message{{Role: "user", Content: "hi"}}
+	got := marshalChat(t, buildToolChat("grok-4.3", messages, 0, 2000, tools, true))
+
+	// thinking=true -> reasoning_effort high (Grok's analog of DeepSeek "max").
+	if got["reasoning_effort"] != "high" {
+		t.Errorf("reasoning_effort = %v, want high", got["reasoning_effort"])
+	}
+	if got["tool_choice"] != "auto" {
+		t.Errorf("tool_choice = %v, want auto", got["tool_choice"])
+	}
+	if got["max_completion_tokens"] != float64(2000) {
+		t.Errorf("max_completion_tokens = %v, want 2000", got["max_completion_tokens"])
+	}
+	// temperature 0 must be on the wire (pointer behavior), not dropped.
+	if got["temperature"] != float64(0) {
+		t.Errorf("temperature = %v, want 0", got["temperature"])
+	}
+
+	gotTools, ok := got["tools"].([]any)
+	if !ok || len(gotTools) != 1 {
+		t.Fatalf("tools = %v, want one entry", got["tools"])
+	}
+	tool, ok := gotTools[0].(map[string]any)
+	if !ok || tool["type"] != "function" {
+		t.Errorf("tools[0] = %v, want type function", gotTools[0])
+	}
+
+	// Plain-chat / deprecated fields must NOT appear on a tool call.
+	for _, key := range []string{"max_tokens", "response_format", "extra_body", "search_parameters"} {
+		if _, present := got[key]; present {
+			t.Errorf("unexpected key %q present in tool request", key)
+		}
+	}
+}
+
+func TestBuildToolChat_NoToolsNoThinking(t *testing.T) {
+	got := marshalChat(t, buildToolChat("grok-4.3", []Message{{Role: "user", Content: "hi"}}, 0.1, 1000, nil, false))
+
+	// With no tools, the tool fields degrade off the wire entirely.
+	for _, key := range []string{"tools", "tool_choice"} {
+		if _, present := got[key]; present {
+			t.Errorf("unexpected key %q present without tools", key)
+		}
+	}
+	// thinking=false leaves reasoning_effort unset (omitempty).
+	if _, present := got["reasoning_effort"]; present {
+		t.Errorf("reasoning_effort must be absent when thinking is false")
+	}
+}
+
 func TestExtractOutputText(t *testing.T) {
 	// A realistic Responses API body: a reasoning item (must be skipped) followed
 	// by the assistant message whose two output_text parts must be concatenated.
