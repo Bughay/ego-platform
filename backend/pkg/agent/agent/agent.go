@@ -62,7 +62,7 @@ const (
 // New builds an Agent for the given provider from a provider-neutral Config.
 // This is the package's main entry point: callers select the backend by value
 // (e.g. from config or a request field) and depend only on the Agent interface.
-func New(p Provider, param AgentParameters) (Agent, error) {
+func NewAgent(p Provider, param AgentParameters) (Agent, error) {
 	switch p {
 	case DeepSeek:
 		return NewDeepSeek(param), nil
