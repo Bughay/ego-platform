@@ -6,9 +6,18 @@ import (
 	"log/slog"
 
 	"github.com/Bughay/egolifter/internal/shared/db"
-	"github.com/Bughay/egolifter/pkg/agent/deepseek"
+	"github.com/Bughay/egolifter/pkg/agent/agent"
+	"github.com/Bughay/egolifter/pkg/agent/prompts"
 	egotools "github.com/Bughay/egolifter/pkg/agent/tools/egolifter"
-	"github.com/Bughay/egolifter/pkg/agent/workflows"
+)
+
+// The EgoLifter bot runs a ReAct agent over the egolifter tools through the
+// provider-neutral pkg/agent/agent layer, so the backend can be swapped without
+// touching this module. These fix the run to Grok with the egolifter prompt.
+const (
+	egolifterModel    = "grok-4.3"
+	egolifterTokens   = 100000
+	egolifterThinking = false
 )
 
 // chatStore is the slice of the repository the service needs: it lets tests
@@ -24,26 +33,38 @@ type chatStore interface {
 }
 
 // Service holds the EgoLifter bot business logic: it persists the user turn,
-// runs the DeepSeek ReAct agent over the egolifter tools, and persists the
-// assistant reply.
+// runs the ReAct agent over the egolifter tools, and persists the assistant
+// reply.
 //
-// runAgent is the seam to the agent (pkg/agent/workflows.RunEgolifterAgent). It
-// is a field so tests can stub it without hitting the network; NewService wires
-// the real one.
+// runAgent is the seam to the agent (pkg/agent/agent). It is a field so tests
+// can stub it without hitting the network; NewService wires the real one.
 type Service struct {
 	repo     chatStore
-	runAgent func(ctx context.Context, userID string, memory []deepseek.Message, prompt string) (string, error)
+	runAgent func(ctx context.Context, userID string, memory []agent.Message, prompt string) (string, error)
 	logger   *slog.Logger
 }
 
 // NewService wires the bot service with its repository, the domain services the
-// agent's tools act on, and a logger. The DeepSeek API key is read from the
-// environment by pkg/agent/deepseek, so it is not passed here.
+// agent's tools act on, and a logger. The provider API key is read from the
+// environment by pkg/agent, so it is not passed here.
 func NewService(repo chatStore, agentSvc egotools.Services, logger *slog.Logger) *Service {
 	return &Service{
 		repo: repo,
-		runAgent: func(ctx context.Context, userID string, memory []deepseek.Message, prompt string) (string, error) {
-			return workflows.RunEgolifterAgent(ctx, agentSvc, userID, memory, prompt)
+		runAgent: func(ctx context.Context, userID string, memory []agent.Message, prompt string) (string, error) {
+			a, err := agent.NewAgent(agent.Grok, agent.AgentParameters{
+				Model:        egolifterModel,
+				SystemPrompt: prompts.EgolifterAgentPrompt,
+				UserPrompt:   prompt,
+				Memory:       memory,
+				Thinking:     egolifterThinking,
+				Registry:     egotools.EgolifterFunctions(ctx, agentSvc, userID),
+				SchemaData:   egotools.SchemaJSON,
+				MaxTokens:    egolifterTokens,
+			})
+			if err != nil {
+				return "", err
+			}
+			return a.Run(ctx)
 		},
 		logger: logger,
 	}
@@ -65,7 +86,7 @@ func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (Cha
 	// question on one turn and use the user's reply on the next. A new chat has
 	// none. Load it before persisting the current message, since the agent
 	// appends that message itself and must not see it twice.
-	var memory []deepseek.Message
+	var memory []agent.Message
 	if chatID == 0 {
 		chat, err := s.repo.CreateChat(ctx, userID, makeTitle(req.Message))
 		if err != nil {
@@ -80,9 +101,9 @@ func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (Cha
 		if err != nil {
 			return ChatResponse{}, err
 		}
-		memory = make([]deepseek.Message, len(msgs))
+		memory = make([]agent.Message, len(msgs))
 		for i, m := range msgs {
-			memory[i] = deepseek.Message{Role: m.Role, Content: m.Content}
+			memory[i] = agent.Message{Role: m.Role, Content: m.Content}
 		}
 	}
 

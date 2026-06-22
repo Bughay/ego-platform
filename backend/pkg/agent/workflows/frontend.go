@@ -5,22 +5,40 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Bughay/egolifter/pkg/agent/deepseek"
+	"github.com/Bughay/egolifter/pkg/agent/agent"
 	"github.com/Bughay/egolifter/pkg/agent/helper"
 	"github.com/Bughay/egolifter/pkg/agent/prompts"
 	tools "github.com/Bughay/egolifter/pkg/agent/tools/frontend_executer"
 )
 
 const (
-	planningModel     = "deepseek-v4-pro"
-	executeModel      = "deepseek-v4-flash"
-	planningTokens    = 200000
-	executeTokens     = 300000
+	planningModel     = "grok-4.3"
+	executeModel      = "grok-4.3"
+	planningTokens    = 100000
+	executeTokens     = 100000
 	executeOnlyTokens = 250000
 	planningTemp      = 0.2
 	planningThinking  = true // reasoning mode for the research/plan phases; flip to disable
-	toolsSchemaPath   = "tools/frontend_executer/frontend_executer.json"
 )
+
+// runPlanning runs one planning-phase completion (the research or the plan step)
+// through the provider-neutral LLM layer with the fixed planning model,
+// temperature, and thinking settings. It centralizes the NewLLM error handling so
+// the call sites stay a single line.
+func runPlanning(systemPrompt, userPrompt string) (string, error) {
+	llm, err := agent.NewLLM(agent.DeepSeek, agent.LLMParameters{
+		Model:        planningModel,
+		SystemPrompt: systemPrompt,
+		UserPrompt:   userPrompt,
+		Temperature:  planningTemp,
+		MaxTokens:    planningTokens,
+		Thinking:     planningThinking,
+	})
+	if err != nil {
+		return "", err
+	}
+	return llm.Complete(context.Background())
+}
 
 // ensureFrontendFiles creates index.html, styles.css, script.js, and plan.md
 // with minimal stubs if they do not already exist in the working directory.
@@ -58,7 +76,7 @@ func VanillaFrontEnd() error {
 	}
 
 	slog.Info("researching", "model", planningModel)
-	research, err := deepseek.DeepseekOneshot(context.Background(), planningModel, prompts.ProjectManager, UMessage+"\n\nHere are the files:\n\n"+researchFiles, planningTemp, planningTokens, planningThinking)
+	research, err := runPlanning(prompts.ProjectManager, UMessage+"\n\nHere are the files:\n\n"+researchFiles)
 	if err != nil {
 		return fmt.Errorf("research phase: %w", err)
 	}
@@ -68,7 +86,7 @@ func VanillaFrontEnd() error {
 	}
 
 	slog.Info("planning", "model", planningModel)
-	plan, err := deepseek.DeepseekOneshot(context.Background(), planningModel, prompts.Teamlead, research+"\n\nHere are the files:\n\n"+researchFiles, planningTemp, planningTokens, planningThinking)
+	plan, err := runPlanning(prompts.Teamlead, research+"\n\nHere are the files:\n\n"+researchFiles)
 	if err != nil {
 		return fmt.Errorf("planning phase: %w", err)
 	}
@@ -96,7 +114,7 @@ func VanillaFrontPlan() error {
 	}
 
 	slog.Info("researching", "model", planningModel)
-	research, err := deepseek.DeepseekOneshot(context.Background(), planningModel, prompts.ProjectManager, UMessage+"\n\nHere are the files:\n\n"+researchFiles, planningTemp, planningTokens, planningThinking)
+	research, err := runPlanning(prompts.ProjectManager, UMessage+"\n\nHere are the files:\n\n"+researchFiles)
 	if err != nil {
 		return fmt.Errorf("research phase: %w", err)
 	}
@@ -106,7 +124,7 @@ func VanillaFrontPlan() error {
 	}
 
 	slog.Info("planning", "model", planningModel)
-	plan, err := deepseek.DeepseekOneshot(context.Background(), planningModel, prompts.Teamlead, research+"\n\nHere are the files:\n\n"+researchFiles, planningTemp, planningTokens, planningThinking)
+	plan, err := runPlanning(prompts.Teamlead, research+"\n\nHere are the files:\n\n"+researchFiles)
 	if err != nil {
 		return fmt.Errorf("planning phase: %w", err)
 	}
@@ -127,24 +145,22 @@ func VanillaFrontExecute() error {
 }
 
 func runExecuteAgent(model, userPrompt string, maxTokens int) error {
-	executeTools, err := deepseek.LoadToolsFromData(tools.SchemaJSON)
-	if err != nil {
-		return fmt.Errorf("load tools schema: %w", err)
-	}
-	agent := &deepseek.Agent{
+	a, err := agent.NewAgent(agent.DeepSeek, agent.AgentParameters{
 		Model:        model,
 		SystemPrompt: prompts.ExecuteAgent,
 		UserPrompt:   userPrompt,
-		Tools:        executeTools,
 		Registry:     tools.FileFunctions(),
 		SchemaData:   tools.SchemaJSON,
 		MaxTokens:    maxTokens,
+	})
+	if err != nil {
+		return fmt.Errorf("build execute agent: %w", err)
 	}
-	result, err := agent.Run(context.Background())
+	result, err := a.Run(context.Background())
 	if err != nil {
 		return fmt.Errorf("agent run: %w", err)
 	}
 	fmt.Println("\n=== Agent finished ===")
-	fmt.Println(result.FinishAnswer())
+	fmt.Println(result)
 	return nil
 }

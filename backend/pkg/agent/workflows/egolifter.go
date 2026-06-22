@@ -10,7 +10,7 @@ import (
 	"github.com/Bughay/egolifter/internal/egolifter/recipe"
 	"github.com/Bughay/egolifter/internal/egolifter/training"
 	"github.com/Bughay/egolifter/internal/shared/config"
-	"github.com/Bughay/egolifter/pkg/agent/deepseek"
+	"github.com/Bughay/egolifter/pkg/agent/agent"
 	"github.com/Bughay/egolifter/pkg/agent/helper"
 	"github.com/Bughay/egolifter/pkg/agent/prompts"
 
@@ -19,13 +19,13 @@ import (
 )
 
 const (
-	egolifterModel    = "deepseek-v4-pro"
+	egolifterModel    = "grok-4.3"
 	egolifterTokens   = 100000
 	egolifterPrompt   = prompts.EgolifterAgentPrompt
 	egolifterThinking = false
 )
 
-// RunEgolifterAgent runs the ReAct DeepSeek agent against the egolifter tools
+// RunEgolifterAgent runs the ReAct Grok agent against the egolifter tools
 // for a single user request and returns the agent's final answer.
 //
 // The caller supplies the assembled domain services and the authenticated
@@ -35,29 +35,26 @@ const (
 // and use the user's reply on the next; pass nil for a one-shot run. This
 // function owns no database — it is the pure workflow and is easy to drive from
 // a test with stub services.
-func RunEgolifterAgent(ctx context.Context, svc egotools.Services, userID string, memory []deepseek.Message, userPrompt string) (string, error) {
-	toolSchema, err := deepseek.LoadToolsFromData(egotools.SchemaJSON)
-	if err != nil {
-		return "", fmt.Errorf("load egolifter tools schema: %w", err)
-	}
-
-	agent := &deepseek.Agent{
+func RunEgolifterAgent(ctx context.Context, svc egotools.Services, userID string, memory []agent.Message, userPrompt string) (string, error) {
+	a, err := agent.NewAgent(agent.Grok, agent.AgentParameters{
 		Model:        egolifterModel,
 		SystemPrompt: egolifterPrompt,
 		UserPrompt:   userPrompt,
 		Memory:       memory,
 		Thinking:     egolifterThinking,
-		Tools:        toolSchema,
 		Registry:     egotools.EgolifterFunctions(ctx, svc, userID),
 		SchemaData:   egotools.SchemaJSON,
 		MaxTokens:    egolifterTokens,
+	})
+	if err != nil {
+		return "", fmt.Errorf("build egolifter agent: %w", err)
 	}
 
-	result, err := agent.Run(ctx)
+	result, err := a.Run(ctx)
 	if err != nil {
 		return "", fmt.Errorf("egolifter agent run: %w", err)
 	}
-	return result.FinishAnswer(), nil
+	return result, nil
 }
 
 // EgolifterAgentREPL is the self-contained entry point: it builds the real

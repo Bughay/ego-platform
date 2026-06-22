@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/Bughay/egolifter/internal/shared/db"
-	"github.com/Bughay/egolifter/pkg/agent/deepseek"
+	"github.com/Bughay/egolifter/pkg/agent/agent"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -72,7 +72,7 @@ func (f *fakeStore) DeleteChat(_ context.Context, _ int64, _ string) error {
 func newTestService(store chatStore, reply string, agentErr error) *Service {
 	return &Service{
 		repo: store,
-		runAgent: func(_ context.Context, _ string, _ []deepseek.Message, _ string) (string, error) {
+		runAgent: func(_ context.Context, _ string, _ []agent.Message, _ string) (string, error) {
 			return reply, agentErr
 		},
 		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),

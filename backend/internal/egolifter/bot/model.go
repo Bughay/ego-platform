@@ -3,9 +3,9 @@
 // internal/egolifter/nutrition for a worked example) and is wrapped with the
 // shared JWT middleware, so it uses the single platform auth.
 //
-// A chat turn runs the DeepSeek ReAct agent (pkg/agent/workflows) over the
-// egolifter tools (log a meal, log a workout, summarize a date range) and
-// persists the conversation in egolifter_chats / egolifter_messages.
+// A chat turn runs the ReAct agent (pkg/agent/agent) over the egolifter tools
+// (log a meal, log a workout, summarize a date range) and persists the
+// conversation in egolifter_chats / egolifter_messages.
 package bot
 
 import (

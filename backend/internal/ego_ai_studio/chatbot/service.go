@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Bughay/egolifter/pkg/agent/deepseek"
-	"github.com/Bughay/egolifter/pkg/agent/grok"
+	"github.com/Bughay/egolifter/pkg/agent/agent"
 	"github.com/Bughay/egolifter/pkg/agent/prompts"
 )
 
@@ -18,34 +17,26 @@ const (
 	defaultModel     = "deepseek-pro"
 )
 
-// provider identifies which LLM backend (pkg/agent/...) serves a given model.
-type provider string
-
-const (
-	providerDeepseek      provider = "deepseek"
-	providerGrok          provider = "grok"
-	providerGrokWebSearch provider = "grok-websearch"
-)
-
-// modelInfo binds a selectable UI model to its provider and the real API id sent
-// on the wire.
+// modelInfo binds a selectable UI model to the agent provider, the LLM call mode
+// (plain chat vs. web search), and the real API id sent on the wire.
 type modelInfo struct {
-	provider provider
+	provider agent.Provider
+	mode     agent.LLMMode
 	apiID    string
 }
 
 // modelRegistry is the allow-list of selectable models: each UI value maps to a
-// provider + real API id. Only these are accepted; resolveModel falls back to the
-// default (DeepSeek pro) for anything else.
+// provider + mode + real API id. Only these are accepted; resolveModel falls back
+// to the default (DeepSeek pro) for anything else.
 var modelRegistry = map[string]modelInfo{
-	"deepseek-pro":   {providerDeepseek, "deepseek-v4-pro"},
-	"deepseek-flash": {providerDeepseek, "deepseek-v4-flash"},
-	"grok":           {providerGrok, "grok-4.3"},
-	"grok-websearch": {providerGrokWebSearch, "grok-4.3"},
+	"deepseek-pro":   {agent.DeepSeek, agent.ModeChat, "deepseek-v4-pro"},
+	"deepseek-flash": {agent.DeepSeek, agent.ModeChat, "deepseek-v4-flash"},
+	"grok":           {agent.Grok, agent.ModeChat, "grok-4.3"},
+	"grok-websearch": {agent.Grok, agent.ModeWebSearch, "grok-4.3"},
 }
 
-// resolveModel maps a UI model value to its provider + API id, defaulting to
-// DeepSeek pro when the value is empty or not one of the allowed models.
+// resolveModel maps a UI model value to its provider + mode + API id, defaulting
+// to DeepSeek pro when the value is empty or not one of the allowed models.
 func resolveModel(uiModel string) modelInfo {
 	if info, ok := modelRegistry[uiModel]; ok {
 		return info
@@ -53,28 +44,18 @@ func resolveModel(uiModel string) modelInfo {
 	return modelRegistry[defaultModel]
 }
 
-// toGrokMessages converts the DeepSeek-typed memory slice into the
-// structurally-identical grok.Message slice for the Grok call path.
-func toGrokMessages(msgs []deepseek.Message) []grok.Message {
-	out := make([]grok.Message, len(msgs))
-	for i, m := range msgs {
-		out[i] = grok.Message{Role: m.Role, Content: m.Content}
-	}
-	return out
-}
-
 // Service holds the AI Studio chat business logic: it loads a chat's history from
-// the DB (the model's memory), calls the DeepSeek engine in pkg/agent, and
-// persists the new user + assistant turns through the Repository.
+// the DB (the model's memory), runs the selected model through the unified LLM
+// layer (pkg/agent/agent), and persists the new user + assistant turns through
+// the Repository.
 type Service struct {
 	repo   *Repository
 	logger *slog.Logger
 }
 
 // NewService wires the AI Studio service with its repository and a logger. The
-// DeepSeek API key (apiKey) is read from the environment by pkg/agent/deepseek,
-// so it is accepted here for wiring symmetry with the other modules but is not
-// stored.
+// provider API keys are read from the environment by pkg/agent, so apiKey is
+// accepted here for wiring symmetry with the other modules but is not stored.
 func NewService(repo *Repository, apiKey string, logger *slog.Logger) *Service {
 	return &Service{repo: repo, logger: logger}
 }
@@ -82,8 +63,8 @@ func NewService(repo *Repository, apiKey string, logger *slog.Logger) *Service {
 // Chat runs one conversational turn with memory:
 //   - chatID 0 starts a new chat (titled from the first user message); otherwise
 //     the chat's prior messages are loaded as memory (404 if not the user's).
-//   - the user message is persisted, DeepSeek is called with system + history +
-//     user, and the assistant reply is persisted.
+//   - the user message is persisted, the selected model is called with system +
+//     history + user, and the assistant reply is persisted.
 //
 // It returns the (possibly newly created) chat id and the assistant reply.
 func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (ChatResponse, error) {
@@ -94,7 +75,7 @@ func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (Cha
 	if systemPrompt == "" {
 		systemPrompt = prompts.BackendAssistant
 	}
-	msgs := []deepseek.Message{{Role: "system", Content: systemPrompt}}
+	msgs := []agent.Message{{Role: "system", Content: systemPrompt}}
 
 	if chatID == 0 {
 		chat, err := s.repo.CreateChat(ctx, userID, makeTitle(req.UserPrompt))
@@ -111,12 +92,12 @@ func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (Cha
 			return ChatResponse{}, err
 		}
 		for _, m := range history {
-			msgs = append(msgs, deepseek.Message{Role: m.Role, Content: m.Content})
+			msgs = append(msgs, agent.Message{Role: m.Role, Content: m.Content})
 		}
 	}
 
 	// Append + persist the new user message.
-	msgs = append(msgs, deepseek.Message{Role: "user", Content: req.UserPrompt})
+	msgs = append(msgs, agent.Message{Role: "user", Content: req.UserPrompt})
 	if _, err := s.repo.AddMessage(ctx, chatID, "user", req.UserPrompt); err != nil {
 		return ChatResponse{}, err
 	}
@@ -128,18 +109,18 @@ func (s *Service) Chat(ctx context.Context, userID string, req ChatRequest) (Cha
 
 	info := resolveModel(req.Model)
 
-	var (
-		reply string
-		err   error
-	)
-	switch info.provider {
-	case providerGrok:
-		reply, err = grok.GrokOneshotMemory(ctx, info.apiID, toGrokMessages(msgs), req.Temperature, maxTokens)
-	case providerGrokWebSearch:
-		reply, err = grok.GrokWebSearchMemory(ctx, info.apiID, toGrokMessages(msgs), req.Temperature, maxTokens)
-	default:
-		reply, err = deepseek.DeepseekOneshotMemory(ctx, info.apiID, msgs, req.Temperature, maxTokens, req.Thinking)
+	llm, err := agent.NewLLM(info.provider, agent.LLMParameters{
+		Model:       info.apiID,
+		Memory:      msgs, // full system + history + user slice, used verbatim
+		Temperature: req.Temperature,
+		MaxTokens:   maxTokens,
+		Thinking:    req.Thinking, // honored by deepseek; grok ignores it (see llm.go)
+		Mode:        info.mode,
+	})
+	if err != nil {
+		return ChatResponse{}, fmt.Errorf("chatSvc.Chat: build llm: %w", err)
 	}
+	reply, err := llm.Complete(ctx)
 	if err != nil {
 		return ChatResponse{}, fmt.Errorf("chatSvc.Chat: %s: %w", info.provider, err)
 	}

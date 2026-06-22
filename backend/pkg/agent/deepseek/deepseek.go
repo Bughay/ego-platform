@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,11 @@ import (
 
 	"github.com/Bughay/egolifter/pkg/agent/helper"
 )
+
+// errEmptyContent mirrors the grok client's sentinel so the two backends behave
+// the same; a caller with a fallback strategy can detect a blank JSON body via
+// errors.Is and retry another way.
+var errEmptyContent = errors.New("LLM returned empty JSON content")
 
 const (
 	deepseekURL = "https://api.deepseek.com/beta/v1/chat/completions"
@@ -223,6 +229,37 @@ func DeepseekOneshotMemory(ctx context.Context, model string, memory []Message, 
 		return "", err
 	}
 	return resp.Choices[0].Message.Content, nil
+}
+
+// DeepseekOneshotJSON sends messages in json_object mode and returns the raw
+// JSON content. It mirrors grok.GrokOneshotJSON: reasoning stays off (no
+// applyThinking, so the output lands in content rather than a reasoning field),
+// it guards finish_reason "length", and returns errEmptyContent on a blank body
+// so a caller with a fallback strategy can detect it via errors.Is.
+func DeepseekOneshotJSON(ctx context.Context, model string, messages []Message, temperature float64, maxTokens int) (string, error) {
+	chat := &ChatTemplate{
+		Model:          model,
+		Messages:       messages,
+		Stream:         false,
+		Temperature:    &temperature,
+		MaxTokens:      maxTokens,
+		ResponseFormat: &ResponseFormat{Type: "json_object"},
+	}
+
+	resp, err := doRequest(ctx, chat)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Choices[0].FinishReason == "length" {
+		return "", fmt.Errorf("output truncated due to max_tokens limit (current: %d)", maxTokens)
+	}
+
+	content := resp.Choices[0].Message.Content
+	if strings.TrimSpace(content) == "" {
+		return "", errEmptyContent
+	}
+	return content, nil
 }
 
 func DeepseekMemoryLoop(ctx context.Context, systemMessage string, temperature float64, maxTokens int, thinking bool) error {

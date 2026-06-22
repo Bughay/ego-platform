@@ -1,9 +1,6 @@
-Drop table if exists "recipe_ingredients" cascade;
-Drop table if exists "recipe" cascade;
-Drop table if exists "exercise" cascade;
-Drop table if exists "workout" cascade;
-Drop table if exists "food_consumed" cascade;
-Drop table if exists "meal" cascade;
-Drop table if exists "food" cascade;
 Drop table if exists "user_profiles" cascade;
 Drop table if exists "users" cascade;
+Drop index IF EXISTS idx_refresh_tokens_user_id;
+Drop table IF EXISTS "refresh_tokens";
+
+
