@@ -10,10 +10,28 @@ import (
 
 // Config holds all application configuration, loaded from environment variables.
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Agent    AgentConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	JWT       JWTConfig
+	Agent     AgentConfig
+	Redis     RedisConfig
+	RateLimit RateLimitConfig
+}
+
+// RateLimitConfig controls the per-IP fixed-window request limiter.
+// Defaults are applied in LoadConfig so the limiter works with no .env entry.
+type RateLimitConfig struct {
+	Enabled   bool // default true
+	Requests  int  // default 100 — max requests per window per IP
+	WindowSec int  // default 60 — window length in seconds
+}
+
+// RedisConfig holds Redis connection settings.
+// All fields default safely so local dev works without a .env entry.
+type RedisConfig struct {
+	Addr     string // default "localhost:6379"
+	Password string // default "" (no auth)
+	DB       int    // default 0
 }
 
 type ServerConfig struct {
@@ -88,6 +106,23 @@ func LoadConfig() (*Config, error) {
 		logLevel = "info"
 	}
 
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+
+	// Rate limiting: enabled unless explicitly set to "false".
+	rateLimitEnabled := os.Getenv("RATE_LIMIT_ENABLED") != "false"
+	rateLimitRequests, _ := strconv.Atoi(os.Getenv("RATE_LIMIT_REQUESTS"))
+	if rateLimitRequests == 0 {
+		rateLimitRequests = 100
+	}
+	rateLimitWindow, _ := strconv.Atoi(os.Getenv("RATE_LIMIT_WINDOW_SEC"))
+	if rateLimitWindow == 0 {
+		rateLimitWindow = 60
+	}
+
 	return &Config{
 		Server: ServerConfig{
 			Port:            port,
@@ -99,5 +134,15 @@ func LoadConfig() (*Config, error) {
 		Database: DatabaseConfig{DSN: dbDSN},
 		JWT:      JWTConfig{Secret: secret, AccessExpiryHours: jwtExpiry, RefreshExpiryDays: refreshExpiryDays},
 		Agent:    AgentConfig{DEEPSEEKAPIKEY: deepseekApiKey, GROKAPIKEY: grokApiKey},
+		Redis: RedisConfig{
+			Addr:     redisAddr,
+			Password: os.Getenv("REDIS_PASSWORD"),
+			DB:       redisDB,
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:   rateLimitEnabled,
+			Requests:  rateLimitRequests,
+			WindowSec: rateLimitWindow,
+		},
 	}, nil
 }

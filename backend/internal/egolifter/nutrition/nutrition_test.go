@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Bughay/egolifter/internal/auth"
+	"github.com/Bughay/egolifter/internal/shared/cache"
 	"github.com/Bughay/egolifter/internal/shared/lib"
 )
 
@@ -416,7 +417,7 @@ func TestCreateFoodValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &stubFoodRepository{}
-			svc := NewNutritionService(repo)
+			svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 			food, err := svc.CreateFood(context.Background(), "user-1", tt.req)
 
@@ -456,7 +457,7 @@ func TestCreateFoods(t *testing.T) {
 
 	t.Run("creates all foods and returns them in order", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		foods, err := svc.CreateFoods(context.Background(), "user-1", []*CreateFoodRequest{
 			valid("oats"), valid("rice"), valid("chicken"),
@@ -474,7 +475,7 @@ func TestCreateFoods(t *testing.T) {
 
 	t.Run("empty slice is rejected before any insert", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		_, err := svc.CreateFoods(context.Background(), "user-1", nil)
 		if err == nil || !strings.Contains(err.Error(), "at least one food") {
@@ -487,7 +488,7 @@ func TestCreateFoods(t *testing.T) {
 
 	t.Run("one invalid food fails the whole batch before any insert", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		_, err := svc.CreateFoods(context.Background(), "user-1", []*CreateFoodRequest{
 			valid("oats"),
@@ -505,7 +506,7 @@ func TestCreateFoods(t *testing.T) {
 func TestFoodIDValidation(t *testing.T) {
 	t.Run("update requires id", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		_, err := svc.UpdateFood(context.Background(), "user-1", &UpdateFoodRequest{ID: "  ", Name: "oats", Calories100: 100})
 		if err == nil || !strings.Contains(err.Error(), "food id is required") {
@@ -518,7 +519,7 @@ func TestFoodIDValidation(t *testing.T) {
 
 	t.Run("update validates payload", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		_, err := svc.UpdateFood(context.Background(), "user-1", &UpdateFoodRequest{ID: "food-1", Name: "", Calories100: 100})
 		if err == nil || !strings.Contains(err.Error(), "food name is required") {
@@ -528,7 +529,7 @@ func TestFoodIDValidation(t *testing.T) {
 
 	t.Run("delete requires id", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		err := svc.DeleteFood(context.Background(), "user-1", "")
 		if err == nil || !strings.Contains(err.Error(), "food id is required") {
@@ -541,7 +542,7 @@ func TestFoodIDValidation(t *testing.T) {
 
 	t.Run("get requires id", func(t *testing.T) {
 		repo := &stubFoodRepository{}
-		svc := NewNutritionService(repo)
+		svc := NewNutritionService(repo, &cache.NopCache{}, testLogger())
 
 		_, err := svc.GetFood(context.Background(), "user-1", "  ")
 		if err == nil || !strings.Contains(err.Error(), "food id is required") {
@@ -580,7 +581,7 @@ func doJSON(t *testing.T, mux *http.ServeMux, method, target, token string, body
 func newFoodServer(t *testing.T, repo FoodRepository) (*http.ServeMux, string) {
 	t.Helper()
 	mgr := auth.NewManager("test-secret", 1, 1)
-	handler := NewNutritionHandler(NewNutritionService(repo), testLogger())
+	handler := NewNutritionHandler(NewNutritionService(repo, &cache.NopCache{}, testLogger()), testLogger())
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux, mgr.Middleware)
 

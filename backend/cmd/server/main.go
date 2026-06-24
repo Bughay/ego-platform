@@ -13,6 +13,7 @@ import (
 	"github.com/Bughay/egolifter/internal/egolifter/profile"
 	"github.com/Bughay/egolifter/internal/egolifter/recipe"
 	"github.com/Bughay/egolifter/internal/egolifter/training"
+	"github.com/Bughay/egolifter/internal/shared/cache"
 	"github.com/Bughay/egolifter/internal/shared/config"
 	"github.com/Bughay/egolifter/internal/shared/lib"
 	egotools "github.com/Bughay/egolifter/pkg/agent/tools/egolifter"
@@ -34,6 +35,21 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Redis — graceful degradation: API continues if Redis is unavailable at startup
+	var appCache cache.Cache
+	redisClient, err := cache.NewRedisClient(context.Background(), cfg.Redis)
+	if err != nil {
+		logger.Warn("redis unavailable — caching disabled, using NopCache",
+			"addr", cfg.Redis.Addr,
+			"error", err,
+		)
+		appCache = &cache.NopCache{}
+	} else {
+		logger.Info("redis connected", "addr", cfg.Redis.Addr)
+		appCache = cache.NewRedisCache(redisClient)
+		defer redisClient.Close()
+	}
+
 	mux := http.NewServeMux()
 
 	// Auth module: handler -> service -> repository
@@ -49,7 +65,7 @@ func main() {
 
 	// Nutrition module: handler -> service -> repository (JWT-protected)
 	foodRepo := nutrition.NewFoodRepository(pool)
-	nutritionSvc := nutrition.NewNutritionService(foodRepo)
+	nutritionSvc := nutrition.NewNutritionService(foodRepo, appCache, logger)
 	nutritionHandler := nutrition.NewNutritionHandler(nutritionSvc, logger)
 	nutritionHandler.RegisterRoutes(mux, jwtManager.Middleware)
 
@@ -113,7 +129,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
-		Handler:      lib.CORS(lib.RequestLogger(logger)(mux)),
+		Handler:      lib.CORS(lib.RequestLogger(logger)(lib.RateLimit(appCache, logger, cfg.RateLimit)(mux))),
 		ReadTimeout:  time.Duration(cfg.Server.ReadTimeoutSec) * time.Second,
 		WriteTimeout: time.Duration(cfg.Server.WriteTimeoutSec) * time.Second,
 	}

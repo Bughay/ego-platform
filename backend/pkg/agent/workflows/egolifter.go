@@ -9,6 +9,7 @@ import (
 	"github.com/Bughay/egolifter/internal/egolifter/nutrition"
 	"github.com/Bughay/egolifter/internal/egolifter/recipe"
 	"github.com/Bughay/egolifter/internal/egolifter/training"
+	"github.com/Bughay/egolifter/internal/shared/cache"
 	"github.com/Bughay/egolifter/internal/shared/config"
 	"github.com/Bughay/egolifter/pkg/agent/agent"
 	"github.com/Bughay/egolifter/pkg/agent/helper"
@@ -73,7 +74,7 @@ func EgolifterAgentREPL(ctx context.Context, userID string) error {
 	defer pool.Close()
 
 	mealSvc := nutrition.NewMealService(nutrition.NewMealRepository(pool))
-	foodSvc := nutrition.NewNutritionService(nutrition.NewFoodRepository(pool))
+	foodSvc := nutrition.NewNutritionService(nutrition.NewFoodRepository(pool), &cache.NopCache{}, slog.Default())
 	trainingSvc := training.NewTrainingService(training.NewTrainingRepository(pool))
 	analyticsSvc := analytics.NewAnalyticsService(mealSvc, trainingSvc)
 	recipeSvc := recipe.NewRecipeService(recipe.NewRecipeRepository(pool))
