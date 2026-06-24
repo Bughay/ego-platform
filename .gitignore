@@ -1,15 +1,12 @@
 # Secrets / local env (never commit)
 .env
-*.env
-!*.env.example
 
-# Go build artifacts
 *.test
 *.out
 *.exe
-
-# Editor / OS
 .DS_Store
 .idea/
 *.swp
 .claude
+CLAUDE.md
+
